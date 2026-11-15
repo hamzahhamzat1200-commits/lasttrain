@@ -744,7 +744,7 @@ function update(dt){
   const draft=clamp(.35+.035*av+.5*ta,.35,1.3);
   const tgt=clamp(S.fuel/3.5,0,1)*Math.min(1,.55+.5*draft);
   S.Tf+=(tgt-S.Tf)*(1-Math.exp(-dt/2.5));
-  S.fuel=Math.max(0,S.fuel-(.008+.056*S.Tf*draft)*dt*(1+.1*L('heat'))*DF().burn*.86*[1,.92,.85][L('boiler')]);
+  S.fuel=Math.max(0,S.fuel-(.008+.056*S.Tf*draft)*dt*(1+.1*L('heat'))*DF().burn*.37*[1,.92,.85][L('boiler')]);
   if(L('stoker')>0){
     S.stokerT-=dt;const th=L('stoker')>1?2.4:1.3;
     if(S.stokerT<=0&&S.fuel<th&&S.coalPile>0){S.coalPile--;S.fuel=Math.min(12,S.fuel+1);S.throws++;S.doorOpen=.55;S.smoke=1.6;S.stokerT=L('stoker')>1?3:6;burst(900,.2,.1,1.5);tone(120,.12,.06);}
