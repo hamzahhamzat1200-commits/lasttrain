@@ -914,7 +914,7 @@ function update(dt){
     if(S.coalPile>4)S.said.low=0;
     if(nb2!==null&&dist<bellR-10&&dist>bellR-60&&!S.said['b'+nb2]){S.said['b'+nb2]=1;say('الجرس يرنّ: سكة مقطوعة أمامنا.',4200);}
   }
-  tutorialTick(dt);alertsTick(dt);hurTick(dt);zTick(dt);
+  tutorialTick(dt);alertsTick(dt);hurTick(dt);zTick(dt);evTick(dt);
   charStep(dt,dirIn);
 
   /* end conditions */
@@ -3631,6 +3631,65 @@ function startOutro(){
   outI=0;renderOutro();
 }
 
+/* ===== v20: main menu, developer tag, random events ===== */
+function menuButtons(){
+  const has=!!loadSave();
+  return [
+    {t:T('رحلة جديدة'),fn:()=>newJourney(false)},
+    {t:T(has?'إكمال الرحلة':'إكمال الرحلة (لا يوجد حفظ)'),fn:has?continueGame:()=>{}, dis:!has},
+    {t:T('الإعدادات'),fn:()=>openSettings(()=>{hideOv();})},
+    {t:T('الخروج'),fn:()=>{try{if(window.AndroidTTS&&AndroidTTS.quit){AndroidTTS.quit();return;}}catch(e){}try{window.close();}catch(e){}$('sText').textContent='يمكنك إغلاق اللعبة من زر الرجوع في هاتفك.';}}
+  ];
+}
+function showScreen(title,text,list,btns){
+  $('sTitle').textContent=title;$('sText').textContent=text;
+  $('sList').style.display=list?'':'none';
+  const box=$('sBtns');box.innerHTML='';box.style.cssText='display:flex;flex-direction:column;gap:10px;align-items:center';
+  btns.forEach((b,i)=>{const e=document.createElement('button');e.type='button';e.className='btn'+(i&&!(b.main)?' alt':'');e.textContent=b.t;
+    e.style.minWidth='13em';if(b.dis){e.style.opacity='.4';e.style.pointerEvents='none';}
+    e.addEventListener('click',b.fn);box.appendChild(e);if(i===0)setTimeout(()=>{try{e.focus();}catch(x){}},50);});
+  $('screen').classList.remove('hide');
+}
+(function(){
+  const st=document.createElement('style');
+  st.textContent='#bSnd,#bSet{display:none!important}#devtag{position:fixed;top:8px;left:12px;z-index:9;font:600 13px/1 system-ui,sans-serif;letter-spacing:.08em;color:rgba(220,235,245,.62);text-shadow:0 0 8px rgba(255,138,61,.5);pointer-events:none;direction:ltr;display:none}';
+  document.head.appendChild(st);
+  const d=document.createElement('div');d.id='devtag';d.textContent='Hamzawe1200';document.body.appendChild(d);
+  setInterval(()=>{const s=document.getElementById('screen');d.style.display=(mode==='menu'&&s&&!s.classList.contains('hide')&&!CIN)?'block':'none';},300);
+})();
+// ---------- random events ----------
+const EV={cd:-1,aur:0,frost:0,flash:0,wolf:0,last:''};
+function evNow(){return mode==='play'&&!S.tut&&!S.ground&&!S.modal&&hurStr()<.05;}
+function evTick(dt){
+  if(!evNow()){return;}
+  EV.aur=Math.max(0,EV.aur-dt);EV.frost=Math.max(0,EV.frost-dt);EV.flash=Math.max(0,EV.flash-dt*2.2);
+  if(EV.wolf>0){EV.wolf-=dt;if(S.v>14){EV.wolf=0;say('تركتَ الذئاب خلفك. صوتها ضاع في الريح.',4200);}
+    else if(EV.wolf<=0){S.hull=Math.max(0,S.hull-7);S.warm=Math.max(0,S.warm-8);say('الذئاب نهشت العربة الأخيرة قبل أن تتركها. زد السرعة في المرة القادمة.',5000);}}
+  if(EV.cd<0)EV.cd=rnd(70,140);
+  EV.cd-=dt;if(EV.cd>0)return;EV.cd=rnd(90,190);
+  const pool=['wolves','supply','pipes','lightning','aurora','steam','frost','signal'].filter(k=>k!==EV.last);
+  const k=pool[Math.floor(Math.random()*pool.length)];EV.last=k;
+  switch(k){
+    case 'wolves':EV.wolf=11;say('ذئاب! قطيع يركض بجانب القطار. زد السرعة قبل أن يقفزوا على العربة.',5200);burst(300,.5,.08,2);tone(180,.6,.05,'sawtooth',120);break;
+    case 'supply':S.coalPile=Math.min(30,S.coalPile+6);S.scrap=(S.scrap||0)+2;say('صندوق إمدادات ملقى بجانب السكة. تعلّق به أحدهم بمظلة قبل سنوات. أخذتَ فحماً وبعض الحديد.',5800);tone(520,.25,.08);break;
+    case 'pipes':S.hull=Math.max(0,S.hull-3);S.Tf*=.85;say('تجمّدت الأنابيب فجأة وسمعتَ طقطقة. الفرن يضعف قليلاً.',4600);burst(1400,.3,.08,3);break;
+    case 'lightning':EV.flash=1;burst(90,1.2,.22,.6);tone(60,.9,.12,'sawtooth',30);if(S.storm>.3){S.hull=Math.max(0,S.hull-4);say('صاعقة ضربت الجليد قرب القطار! اهتزّ الهيكل.',4200);}else say('ومض في السماء السوداء، ثم رعدٌ بعيد. عاصفة في مكانٍ ما.',4200);break;
+    case 'aurora':EV.aur=28;S.warm=Math.min(100,S.warm+8);say('شفق أخضر يرقص في السماء. نسيتَ البرد للحظة.',5200);break;
+    case 'steam':S.Tf*=.9;S.fuel=Math.max(0,S.fuel-.8);say('تسرّب بخار من وصلة قديمة. خسرتَ بعض الحرارة.',4400);burst(2600,.8,.07,.8);break;
+    case 'frost':EV.frost=22;say('الصقيع يغطّي النوافذ. بالكاد ترى الطريق.',4400);break;
+    case 'signal':S.flags=S.flags||{};S.flags.signal=1;say('على الراديو: «…الفجر…ننتظركم… اتجهوا شرقاً…» ثم صمت.',6000);tone(900,.2,.05);tone(700,.2,.05);break;
+  }
+}
+function evOverlay(){
+  if(EV.aur>0){const a=Math.min(1,EV.aur/4,(28-EV.aur)/3+.01),t=S.t;ctx.save();ctx.globalCompositeOperation='lighter';
+    for(let k=0;k<3;k++){const g=ctx.createLinearGradient(0,0,0,CH*.55);g.addColorStop(0,'rgba(80,255,170,0)');g.addColorStop(.5,'rgba(90,255,190,'+(.13*a)+')');g.addColorStop(1,'rgba(120,120,255,0)');ctx.fillStyle=g;
+      ctx.beginPath();ctx.moveTo(0,0);for(let x=0;x<=CW;x+=40)ctx.lineTo(x,CH*(.12+.16*k/2)+Math.sin(x*.01+t*.6+k*2)*28);ctx.lineTo(CW,CH*.5);ctx.lineTo(0,CH*.5);ctx.fill();}
+    ctx.restore();}
+  if(EV.frost>0){const a=Math.min(1,EV.frost/3);ctx.save();const g=ctx.createRadialGradient(CW/2,CH/2,CH*.25,CW/2,CH/2,CH*.85);g.addColorStop(0,'rgba(210,235,255,0)');g.addColorStop(1,'rgba(210,235,255,'+(.45*a)+')');ctx.fillStyle=g;ctx.fillRect(0,0,CW,CH);ctx.restore();}
+  if(EV.flash>0){ctx.save();ctx.fillStyle='rgba(235,245,255,'+(.55*EV.flash)+')';ctx.fillRect(0,0,CW,CH);ctx.restore();}
+}
+window.__ev=EV;
+
 function flames(x,y,w,h,k){
   const n=5;
   for(let i=0;i<n;i++){
@@ -3672,10 +3731,10 @@ function drawTrain(){
   ctx.fillStyle='#6b8aa2';rr(126,FLOOR-39,52,11,5);ctx.fill();ctx.fillStyle='#8fb0c6';rr(128,FLOOR-43,16,8,4);ctx.fill();
   ctx.strokeStyle='#c4d4df';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(60,FLOOR);ctx.lineTo(60,FLOOR-50);ctx.stroke();
   ctx.fillStyle='#31475b';ctx.fillRect(52,FLOOR-3,16,3);
-  ctx.save();ctx.translate(60,FLOOR-64);ctx.rotate(S.brakeAng);
-  ctx.strokeStyle=S.brake>.15?'#ffb27a':'#c4d4df';ctx.lineWidth=3;circ(0,0,14);ctx.stroke();
-  ctx.lineWidth=2;ctx.beginPath();for(let k=0;k<3;k++){const a=k*Math.PI/3;ctx.moveTo(Math.cos(a)*14,Math.sin(a)*14);ctx.lineTo(-Math.cos(a)*14,-Math.sin(a)*14);}ctx.stroke();
-  ctx.fillStyle='#ff8a3d';circ(0,0,2.6);ctx.fill();ctx.restore();
+  ctx.save();ctx.translate(60,FLOOR-58);ctx.rotate(S.brakeAng);
+  ctx.strokeStyle=S.brake>.15?'#ffb27a':'#c4d4df';ctx.lineWidth=2.2;circ(0,0,8.5);ctx.stroke();
+  ctx.lineWidth=1.5;ctx.beginPath();for(let k=0;k<3;k++){const a=k*Math.PI/3;ctx.moveTo(Math.cos(a)*8.5,Math.sin(a)*8.5);ctx.lineTo(-Math.cos(a)*8.5,-Math.sin(a)*8.5);}ctx.stroke();
+  ctx.fillStyle='#ff8a3d';circ(0,0,1.8);ctx.fill();ctx.restore();
 
   /* tender */
   ctx.fillStyle=lin(0,FLOOR-58,0,FLOOR,[[0,'#1c3042'],[1,'#101e2b']]);ctx.fillRect(200,FLOOR-58,180,58);
@@ -4052,7 +4111,7 @@ function overlays(){
   }
   if(S.flash>0){ctx.fillStyle='rgba(255,80,40,'+(S.flash*.45)+')';ctx.fillRect(0,0,CW,CH);}
   if(S.warm<18){const k=(1-S.warm/18)*(.45+.2*Math.sin(S.t*5));ctx.fillStyle='rgba(8,20,40,'+(k*.6)+')';ctx.fillRect(0,0,CW,CH);}
-  try{zonesOverlay();hurricaneOverlay();bodyTempHUD();}catch(e){}
+  try{zonesOverlay();hurricaneOverlay();evOverlay();bodyTempHUD();}catch(e){}
 }
 function render(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
@@ -4141,7 +4200,7 @@ function frame(ts){
   try{domUpdate();audioTick();}catch(e){window.__err=e;}
 }
 fit();camera(0,true);
-showScreen("آخر قطار","الكوكب تجمّد. بقي قطار واحد، وفحم قليل، وأملٌ بعيد.",true,menuButtons());
+showScreen("آخر قطار","الكوكب تجمّد. بقي قطار واحد، وفحم قليل، وأملٌ بعيد.",false,menuButtons());
 requestAnimationFrame(frame);
 window.__dbg={S:()=>S,zt:v=>{ZT=v;},Z:()=>({STATIONS,BREAKS,DRIFTS,CRATES,ICES,DEEPS,FOGS,WOWS,CRIT,BLOCKS})};
 })();

@@ -138,6 +138,7 @@ jobs:
                       if (tts != null && ttsOk) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "lt");
                   }
                   @JavascriptInterface public void stop() { if (tts != null) tts.stop(); }
+                  @JavascriptInterface public void quit() { runOnUiThread(new Runnable() { @Override public void run() { finishAffinity(); } }); }
               }
 
               @Override
