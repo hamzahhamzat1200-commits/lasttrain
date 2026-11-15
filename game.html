@@ -744,7 +744,7 @@ function update(dt){
   const draft=clamp(.35+.035*av+.5*ta,.35,1.3);
   const tgt=clamp(S.fuel/3.5,0,1)*Math.min(1,.55+.5*draft);
   S.Tf+=(tgt-S.Tf)*(1-Math.exp(-dt/2.5));
-  S.fuel=Math.max(0,S.fuel-(.008+.056*S.Tf*draft)*dt*(1+.1*L('heat'))*DF().burn);
+  S.fuel=Math.max(0,S.fuel-(.008+.056*S.Tf*draft)*dt*(1+.1*L('heat'))*DF().burn*[1,.92,.85][L('boiler')]);
   if(L('stoker')>0){
     S.stokerT-=dt;const th=L('stoker')>1?2.4:1.3;
     if(S.stokerT<=0&&S.fuel<th&&S.coalPile>0){S.coalPile--;S.fuel=Math.min(12,S.fuel+1);S.throws++;S.doorOpen=.55;S.smoke=1.6;S.stokerT=L('stoker')>1?3:6;burst(900,.2,.1,1.5);tone(120,.12,.06);}
@@ -858,11 +858,11 @@ function update(dt){
   const px=S.px;
   const shelter=shelterAt(px);
   const prox=clamp(1-Math.abs(px-432)/210,0,1);
-  const gain=12*S.Tf*prox*Math.min(1,shelter+.15)+heaterGainAt(px)+(S.flags.cat&&px<-390&&px>-590?1.2:0);
+  const gain=(1+.2*L('thermos'))*12*S.Tf*prox*Math.min(1,shelter+.15)+heaterGainAt(px)+(S.flags.cat&&px<-390&&px>-590?1.2:0);
   S.snap=Math.max(0,S.snap-dt);
   const sn=S.snap>0?1.7:1;
   const ins=1-.18*L('insul')-(S.flags.plant?.04:0);
-  const coldFront=(.85+.04*av+1.6*S.storm+1.1*S.ice+1.5*S.deep+2.5*hurStr())*(L('heat')>=3?.8:1),coldCab=.55+.02*av+.45*S.storm+.35*S.ice+.5*S.deep+3.0*hurStr();
+  const coldFront=(.85+.04*av+1.6*S.storm+1.1*S.ice+1.5*S.deep+2.5*hurStr())*(L('heat')>=3?.8:1),coldCab=(.55+.02*av+.45*S.storm+.35*S.ice+.5*S.deep+3.0*hurStr())*(1-.15*L('xchg'));
   const cold=lerp(coldFront,coldCab,shelter)*ins*sn*DF().cold;
   S.warm=clamp(S.warm+(gain-cold)*dt,0,100);
 
@@ -3202,7 +3202,7 @@ function menuBgDraw(M,dt){
 /* ===== v17: random hurricanes: wind pushes the train, brakes must be set, cab heat, damage while moving, metal groans ===== */
 const HUR={ph:0,t:0,cd:-1,str:0,dir:-1,dur:45,loose:[],deb:[],flash:0,gT:2,hT:.5,bT:0,dmgT:0,coalT:0,said:0};
 function hurStr(){return HUR.str;}
-function hurWindA(){return HUR.str>.01?HUR.dir*HUR.str*1.8*(1-.93*S.brake):0;}
+function hurWindA(){return HUR.str>.01?HUR.dir*HUR.str*1.8*(1-.25*L('storm')/2)*(1-(.93+.06*L('airb'))*S.brake):0;}
 function hurTilt(){const h=HUR.str;if(h<.02)return 0;return Math.sin(S.t*2.7)*.012*h+Math.sin(S.t*7.3)*.006*h+HUR.dir*.012*h;}
 function hurTick(dt){
   if(S.tut||mode!=='play'){return;}
@@ -3230,7 +3230,7 @@ function hurTick(dt){
     // damage when forced through it (moving)
     const av=Math.abs(S.v);
     if(h>.3&&av>5){
-      S.hull-=h*Math.min(1.4,av/26)*.55*dt;
+      S.hull-=h*Math.min(1.4,av/26)*.55*dt*(1-.25*L('storm'));
       HUR.coalT-=dt;if(HUR.coalT<=0&&S.coalPile>.5){HUR.coalT=rnd(2.5,4.5);S.coalPile=Math.max(0,S.coalPile-.5);for(let i=0;i<5;i++)HUR.deb.push({x:TL+rnd(180,330),y:FLOOR-34,vx:HUR.dir*rnd(160,330),vy:rnd(-120,-30),r:rnd(1.4,3),a:1,coal:1,rot:0,vr:0});}
       HUR.bT-=dt;if(HUR.bT<=0){HUR.bT=rnd(5,9);S.hull-=1.6;S.shake=.55;S.flash=.25;try{burst(250,.45,.35,.8);tone(60,.35,.22,'sawtooth',38);metalGroan(1);}catch(e){}
         for(let i=0;i<4;i++)HUR.deb.push({x:TL+rnd(-500,700),y:FLOOR-rnd(90,170),vx:HUR.dir*rnd(240,520),vy:rnd(-160,40),r:rnd(3,7),a:1,plate:1,rot:rnd(0,6),vr:rnd(-9,9)});}
@@ -3334,14 +3334,14 @@ function zTick(dt){
   for(const k in ZINFO){
     for(const a of ZINFO[k].arr()){
       const key=k+a[0];
-      if(S.d>a[0]-650&&S.d<a[0]+60&&!Z.said[key]){Z.said[key]=1;alertSay(ZINFO[k].how,8500,k==='rad'?'fire':'cold');try{tone(k==='rad'?880:520,.25,.06,'square');}catch(e){}}
+      if(S.d>a[0]-650-300*L('search')&&S.d<a[0]+60&&!Z.said[key]){Z.said[key]=1;alertSay(ZINFO[k].how,8500,k==='rad'?'fire':'cold');try{tone(k==='rad'?880:520,.25,.06,'square');}catch(e){}}
     }
     const inz=z[k]>.5;if(Z.wasIn[k]&&!inz&&!S.broke){alertSay(k==='rad'?'عبرنا الإشعاع. الهواء هنا أنظف.':k==='thin'?'خرجنا من الجليد الرقيق.':'خرجنا من الوادي سالمين.',4200,'info');}Z.wasIn[k]=inz;
   }
   // ----- radiation: slow = the hull melts -----
   if(z.rad>.05){
     const slow=Math.max(0,Math.min(1,(24-v)/16));
-    S.hull-=z.rad*slow*1.9*dt;
+    S.hull-=z.rad*slow*1.9*dt*[1,.65,.4][L('shield')];
     Z.gT-=dt;if(Z.gT<=0){Z.gT=.5/(.1+z.rad*(.6+slow*2.2))*(.5+Math.random());try{burst(3400,.012,.07,6);}catch(e){}}
     if(slow>.45&&z.rad>.5&&(Z.rT-=dt)<=0){Z.rT=6;alertSay('الهيكل يذوب! أسرِع!',3200,'fire');}
     if(slow>.3)S.shake=Math.max(S.shake||0,.08*z.rad);
@@ -3349,7 +3349,7 @@ function zTick(dt){
   // ----- thin ice: heavy and fast cracks it -----
   if(z.thin>.05){
     const hv=Math.max(0,Math.min(1,(v-9)/12)),hb=(S.brake>.5&&v>6)?.8:0;
-    Z.crack=Math.max(0,Math.min(1.2,Z.crack+(z.thin*(hv*.3+hb*.5)-.05*(1-hv))*dt));
+    Z.crack=Math.max(0,Math.min(1.2,Z.crack+(z.thin*(hv*.3+hb*.5)*[1,.7,.45][L('cleats')]-.05*(1-hv))*dt));
     Z.iT-=dt;if(Z.iT<=0&&z.thin>.3){Z.iT=rnd(.5,1.8)/(.4+Z.crack*2);try{tone(rnd(280,800),.3,.03+.04*Z.crack,'sine',rnd(120,420));if(Z.crack>.4)burst(rnd(1600,2600),.08,.12*Z.crack,3);}catch(e){}}
     if(Z.crack>.65&&!Z.said.crk){Z.said.crk=1;alertSay('الجليد يتشقّق تحت العجلات! أبطئ بهدوء.',4200,'cold');}
     if(Z.crack<.3)Z.said.crk=0;
@@ -3449,6 +3449,187 @@ function stationShelter(i,x,s,lit){
   ctx.restore();
 }
 window.__z=()=>({RADS,THINS,AVALS,STATIONS,_zt});
+
+/* ===== v19: content pack: 16 new places, 8 upgrades, branching endings ===== */
+// ---------- new props ----------
+const _drawPropOld=drawProp;
+drawProp=function(p,x,fresh){
+  const y=GY-2,t=S.t;
+  switch(p.k){
+    case 'camp':
+      ctx.fillStyle='#24384a';ctx.beginPath();ctx.moveTo(x-52,y);ctx.lineTo(x-8,y-44);ctx.lineTo(x+6,y-30);ctx.lineTo(x+44,y-6);ctx.lineTo(x+50,y);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#4a647a';ctx.lineWidth=1.5;ctx.stroke();snowCap(x-30,y-40,50);
+      ctx.fillStyle='#0a1520';ctx.beginPath();ctx.moveTo(x-8,y);ctx.lineTo(x-4,y-26);ctx.lineTo(x+8,y);ctx.fill();
+      ctx.strokeStyle='#33261a';ctx.lineWidth=3;for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(x+70+k*3,y-2);ctx.lineTo(x+86-k*2,y-6-k*2);ctx.stroke();}
+      ctx.fillStyle='#6a3030';ctx.fillRect(x+98,y-6,9,6);ctx.fillRect(x+104,y-10,5,5);
+      if(fresh){ctx.save();ctx.globalCompositeOperation='lighter';glow(x+78,y-6,34,'255,150,70',.12+.04*Math.sin(t*3));ctx.restore();}break;
+    case 'tank':
+      ctx.fillStyle='#2a3b2e';rr(x-70,y-34,140,22,8);ctx.fill();ctx.strokeStyle='#4a5d4d';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.fillStyle='#223226';rr(x-32,y-56,64,24,8);ctx.fill();ctx.fillRect(x+28,y-48,86,6);
+      ctx.fillStyle='#10161c';for(let k=0;k<6;k++){ctx.beginPath();ctx.arc(x-56+k*22,y-8,9,0,7);ctx.fill();}
+      ctx.fillStyle='#10161c';rr(x-72,y-17,144,10,5);ctx.fill();snowCap(x-70,y-36,140);snowCap(x-30,y-58,60);break;
+    case 'carousel':
+      ctx.fillStyle='#4a2a3a';ctx.beginPath();ctx.moveTo(x-70,y-80);ctx.lineTo(x,y-124);ctx.lineTo(x+70,y-80);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#c9bfa8';for(let k=0;k<7;k++){ctx.beginPath();ctx.arc(x-63+k*21,y-80,10.5,0,Math.PI);ctx.fill();}
+      ctx.strokeStyle='#8a99a6';ctx.lineWidth=2.6;for(let k=0;k<5;k++){ctx.beginPath();ctx.moveTo(x-56+k*28,y-80);ctx.lineTo(x-56+k*28,y);ctx.stroke();}
+      ctx.fillStyle='#10161c';for(let k=0;k<3;k++){const hx=x-40+k*40;ctx.fillRect(hx-10,y-50+(k%2)*6,20,12);ctx.fillRect(hx+6,y-60+(k%2)*6,6,12);}
+      ctx.fillStyle='#31475b';ctx.fillRect(x-74,y-8,148,8);snowCap(x-70,y-126,140);break;
+    case 'windmill':{
+      ctx.fillStyle='#2a3c4f';ctx.beginPath();ctx.moveTo(x-30,y);ctx.lineTo(x-16,y-120);ctx.lineTo(x+16,y-120);ctx.lineTo(x+30,y);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#10161c';ctx.fillRect(x-7,y-32,14,32);snowCap(x-18,y-124,36);
+      ctx.save();ctx.translate(x,y-118);ctx.rotate(t*.25);ctx.fillStyle='#8a99a6';for(let k=0;k<4;k++){ctx.save();ctx.rotate(k*Math.PI/2);ctx.fillRect(-3,-4,6,-84);ctx.fillStyle='rgba(200,225,240,.35)';ctx.fillRect(3,-82,16,-0.01);ctx.fillRect(3,-8,18,-70);ctx.fillStyle='#8a99a6';ctx.restore();}
+      ctx.fillStyle='#233b52';circ(0,0,6);ctx.fill();ctx.restore();break;}
+    case 'church':
+      ctx.fillStyle='#1d3043';ctx.fillRect(x-70,y-70,100,70);ctx.beginPath();ctx.moveTo(x-76,y-70);ctx.lineTo(x-20,y-104);ctx.lineTo(x+36,y-70);ctx.fill();
+      ctx.fillStyle='#17283a';ctx.fillRect(x+30,y-130,34,130);ctx.beginPath();ctx.moveTo(x+26,y-130);ctx.lineTo(x+47,y-176);ctx.lineTo(x+68,y-130);ctx.fill();
+      ctx.strokeStyle='#cfd9e0';ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(x+47,y-176);ctx.lineTo(x+47,y-194);ctx.moveTo(x+41,y-187);ctx.lineTo(x+53,y-187);ctx.stroke();
+      ctx.fillStyle=fresh?'rgba(255,190,110,.8)':'#0a1520';for(const wx of [-56,-30,-4]){ctx.fillRect(x+wx,y-52,14,28);}ctx.fillStyle='#0a1520';ctx.beginPath();ctx.arc(x+47,y-100,8,0,7);ctx.fill();
+      snowCap(x-76,y-72,106);snowCap(x+28,y-132,38);
+      if(fresh){ctx.save();ctx.globalCompositeOperation='lighter';glow(x-26,y-40,70,'255,170,90',.2);ctx.restore();}break;
+    case 'bus':
+      ctx.fillStyle='#8a6a1a';rr(x-80,y-52,160,46,8);ctx.fill();ctx.strokeStyle='#4a3a10';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.fillStyle='rgba(160,205,230,.28)';for(let k=0;k<6;k++)ctx.fillRect(x-70+k*24,y-44,18,16);
+      ctx.fillStyle='#10161c';ctx.beginPath();ctx.arc(x-50,y-6,11,0,7);ctx.fill();ctx.beginPath();ctx.arc(x+50,y-6,11,0,7);ctx.fill();snowCap(x-80,y-54,160);
+      ctx.fillStyle='rgba(255,230,160,.5)';for(let k=0;k<3;k++)ctx.fillRect(x-62+k*48,y-26,14,7);break;
+    case 'relay':
+      ctx.strokeStyle='#6a7d8c';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x-22,y);ctx.lineTo(x,y-190);ctx.lineTo(x+22,y);ctx.stroke();
+      ctx.lineWidth=1.4;for(let k=1;k<9;k++){const yy=y-k*21,w=22*(1-k/9);ctx.beginPath();ctx.moveTo(x-w,yy);ctx.lineTo(x+w,yy+10);ctx.moveTo(x+w,yy);ctx.lineTo(x-w,yy+10);ctx.stroke();}
+      ctx.fillStyle='rgba(255,60,50,'+(.3+.7*(Math.sin(t*3)>.6?1:0))+')';circ(x,y-192,4);ctx.fill();
+      ctx.save();ctx.globalCompositeOperation='lighter';glow(x,y-192,40,'255,60,50',.2*(Math.sin(t*3)>.6?1:0));ctx.restore();
+      ctx.fillStyle='#1c2d3e';ctx.fillRect(x+34,y-30,40,30);snowCap(x+32,y-32,44);break;
+    case 'phone':
+      ctx.fillStyle='#6a2020';ctx.fillRect(x-14,y-84,28,84);ctx.fillStyle=fresh?'rgba(255,220,160,.85)':'rgba(160,205,230,.25)';ctx.fillRect(x-10,y-76,20,48);
+      ctx.fillStyle='#10161c';ctx.fillRect(x-14,y-90,28,6);snowCap(x-15,y-92,30);
+      if(fresh){ctx.save();ctx.globalCompositeOperation='lighter';glow(x,y-52,60,'255,200,130',.25+.1*Math.sin(t*14));ctx.restore();ctx.strokeStyle='rgba(255,230,180,'+(.5+.4*Math.sin(t*14))+')';ctx.lineWidth=1.4;for(let k=1;k<3;k++){ctx.beginPath();ctx.arc(x+18,y-60,6*k,-1,1);ctx.stroke();}}break;
+    case 'cages':
+      for(let k=0;k<3;k++){const cx=x-90+k*66;ctx.strokeStyle='#5a6b78';ctx.lineWidth=2;ctx.strokeRect(cx,y-60,56,60);for(let b=1;b<6;b++){ctx.beginPath();ctx.moveTo(cx+b*9.3,y-60);ctx.lineTo(cx+b*9.3,y);ctx.stroke();}
+        ctx.fillStyle='rgba(225,238,248,.7)';ctx.fillRect(cx,y-62,56,4);}
+      ctx.fillStyle='#0c1824';ctx.beginPath();ctx.ellipse(x+108,y-14,12,8,0,0,7);ctx.fill();break;
+    case 'violin':
+      ctx.fillStyle='#31475b';ctx.fillRect(x-30,y-10,60,10);iceFig(x,y-24,1.1,0);
+      ctx.fillStyle='#6a3a1a';ctx.beginPath();ctx.ellipse(x+8,y-38,6,9,.5,0,7);ctx.fill();ctx.strokeStyle='#cfd9e0';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(x-12,y-50);ctx.lineTo(x+22,y-30);ctx.stroke();
+      if(fresh){ctx.save();ctx.globalCompositeOperation='lighter';glow(x,y-34,50,'200,230,255',.12);ctx.restore();}break;
+    default:_drawPropOld(p,x,fresh);
+  }
+};
+// ---------- new places (inserted before the last two so the finale stays last) ----------
+(function(){
+  const NEW=[
+  {id:'camp',title:'مخيّم الأطفال',prop:{k:'camp'},
+   lines:['خيمة منهارة تحت الثلج وبجانبها نار انطفأت منذ زمن.','على الأرض حذاء صغير مقلوب، وفي داخله ورقة: «ماما قالت ننتظر هنا».'],
+   q:'الريح تحرّك قماش الخيمة كأنها تتنفّس.',
+   a:{t:'خذ البطانية الحرارية',res:{warm:25,scrap:2,text:'لُفّتْ حول كتفيك. كان الدفء غريباً… كأنه دَيْن.'}},
+   b:{t:'ادفن الحذاء بجانب الخيمة',res:{flag:'mercy',warm:15,text:'غطيتَه بالثلج، وأطفأتَ شيئاً في داخلك كان يرتجف.'}}},
+  {id:'tank',title:'الدبابة الصامتة',prop:{k:'tank'},
+   lines:['دبابة توقفت وسط الطريق. الجنود تركوا الأبواب مفتوحة وذهبوا.','على الرشاش علّقوا قبعتين، وتحتهما ورقة: «لم نجد أحداً نقاتله».'],
+   q:'في خزانها وقود، وفي مقصورتها جهاز لاسلكي قديم.',
+   a:{t:'اسحب الوقود',res:{coal:12,flag:'greed',text:'امتلأت عربة الفحم. وشعرتَ أنك أخذتَ شيئاً أكثر من الوقود.'}},
+   b:{t:'خذ اللاسلكي فقط',res:{scrap:5,flag:'signal',text:'لم تنقذ اللاسلكي كله، لكنه التقط خيطاً ضعيفاً: «محطة الفجر… محطة الفجر…»'}}},
+  {id:'carousel',title:'دوّارة الخيل',prop:{k:'carousel'},
+   lines:['دوّارة ملاهٍ والخيول الخشبية متجمدة وهي تركض.','في مركزها صندوق موسيقى صغير بمفتاح.'],
+   q:'المفتاح ما زال يدور.',
+   a:{t:'أدر المفتاح',res:{flag:'music',warm:20,text:'خرجت لحنٌ بطيء. دارت الخيول نصف دورة، ثم صمتت. ابتسمتَ.'}},
+   b:{t:'فكّ النحاس من الصندوق',res:{scrap:8,text:'كان النحاس ثميناً. والصمت أثقل.'}}},
+  {id:'windmill',title:'طاحونة الهواء',prop:{k:'windmill'},
+   lines:['طاحونة ما زالت تدور ببطء وحدها فوق التل.','الريح تحمل رائحة غريبة: ليست ثلجاً، بل شيئاً أنظف.'],
+   q:'يمكنك الصعود إلى القمة.',
+   a:{t:'اصعد وانظر شرقاً',res:{warm:20,flag:'hope',text:'من القمة رأيتَ خطاً رفيعاً من الضوء على الأفق. ثابتاً. حقيقياً.'}},
+   b:{t:'خذ مسننات الطاحونة',res:{scrap:9,text:'المسننات مصقولة من الاستعمال. استعملتَها في القطار.'}}},
+  {id:'church',title:'الكنيسة',prop:{k:'church'},
+   lines:['كنيسة صغيرة وجرسها ما زال معلّقاً. على مقاعدها أغطية وشموع.','بعضهم مات وهو يصلّي، وبعضهم نام فقط.'],
+   q:'الحبل يتدلّى أمامك.',
+   a:{t:'اقرع الجرس',res:{flag:'bell',warm:15,text:'رنّ الجرس بعيداً في الثلج. من بعيد… جاء صدى. أو هكذا ظننتَ.'}},
+   b:{t:'اجلس في صمت',res:{warm:45,text:'لم تصلِّ، لكنك جلستَ. هذا كافٍ.'}}},
+  {id:'bus',title:'حافلة المدرسة',prop:{k:'bus'},
+   lines:['حافلة صفراء. المقاعد الصغيرة مصطفّة، والحقائب على الأرض.','على النوافذ المتجمدة رسومات بأصابع صغيرة: شمس، بيت، قطار.'],
+   q:'قطار؟ كأنهم عرفوك قبل أن تأتي.',
+   a:{t:'خذ رسم القطار',res:{flag:'drawings',warm:20,text:'مسحتَ الصقيع بحذر وطويتَ الورقة في جيبك.'}},
+   b:{t:'اترك كل شيء كما هو',res:{warm:30,text:'بعض الأماكن تحتاج من يحرسها، لا من يسرقها.'}}},
+  {id:'relay',title:'برج الإرسال',prop:{k:'relay'},
+   lines:['برج إرسال أحمر الضوء ما زال يومض. الطاقة في بطارياته تكاد تنفد.','اللوحة مكتوب عليها: «إن أصلحتَني، سأصل إلى كل أحد.»'],
+   q:'يحتاج إلى فحم لتوليد الكهرباء.',
+   a:{t:'أمدّه بفحم (٣)',res:{coal:-3,flag:'signal',scrap:3,text:'اشتعل البرج بطنين طويل. صوتٌ بعيد أجاب: «سمعناك!»'}},
+   b:{t:'انزع نحاسه',res:{scrap:8,text:'سقط البرج صامتاً. أخذتَ النحاس ولم تلتفت.'}}},
+  {id:'phone',title:'كابينة الهاتف',prop:{k:'phone'},
+   lines:['كابينة هاتف حمراء في وسط اللا شيء. الرنين يملأ المكان!','لا أسلاك. لا كهرباء. ولكنه يرنّ.'],
+   q:'يرنّ للمرة العاشرة.',
+   a:{t:'ارفع السماعة',res:{flag:'layla',warm:30,text:'«…مرحباً؟ أنا ليلى. من محطة الفجر. أخيراً… أحدٌ يسمع.» ثم انقطع الصوت.'}},
+   b:{t:'تجاهله وامضِ',res:{text:'توقف الرنين فور ابتعادك. صمتٌ أسوأ من الرنين.'}}},
+  {id:'zoo',title:'حديقة الحيوان',prop:{k:'cages'},
+   lines:['أقفاص فارغة وأبوابها مفتوحة. لا جثث.','آثار أقدام صغيرة تغادر القفص الأخير وتتجه نحو السكة.'],
+   q:'من الخلف: صوت صغير، مثل أنين.',
+   a:{t:'اترك له بقايا طعامك',res:{flag:'fox',warm:20,text:'ثعلب أبيض صغير ظهر وأخذ الطعام وعيناه تلمعان. تبعك حتى طرف الأقفاص ثم عاد.'}},
+   b:{t:'تجاهل الصوت',res:{scrap:3,text:'جمعتَ حديد الأقفال. الأنين استمرّ خلفك طويلاً.'}}},
+  {id:'bakery',title:'المخبز',prop:{k:'house',lit:0,chimney:1,row:1},
+   lines:['مخبز صغير: الخبز في الأفران صار حجراً، لكن رائحته ما زالت في الجدران.','على الطاولة ورقة: «إن جاع أحد، فالباب مفتوح».'],
+   q:'في الخلف صندوق طعام مُعلَّب.',
+   a:{t:'تناول شيئاً',res:{warm:45,text:'كان أول طعام حقيقي منذ أيام. شكرتَ الورقة.'}},
+   b:{t:'اترك الصندوق لمن بعدك',res:{flag:'mercy',warm:20,text:'تركتَ ورقتك بجانب ورقتهم: «أنا مررت. كل شيء بخير.»'}}},
+  {id:'lab',title:'المختبر',prop:{k:'house',lit:1,chimney:0,row:1},
+   lines:['مختبر بيولوجي خافت الضوء. أجهزة التبريد ما زالت تعمل بطاقة جيوحرارية.','في الداخل علب بذور مرقّمة بعناية: قمح، شعير، عدس.'],
+   q:'«بنك البذور الأخير» كُتب على الدفتر.',
+   a:{t:'خذ علبة البذور',res:{flag:'seeds',scrap:2,text:'ضممتَ العلبة إلى صدرك. صارت للرحلة معنى آخر.'}},
+   b:{t:'خذ بطارياتهم الشمسية',res:{scrap:10,flag:'greed',text:'الطاقة تكفي القطار لأيام. والبذور تنتظر من غيرك.'}}},
+  {id:'forest',title:'الغابة الصامتة',prop:{k:'tree'},
+   lines:['غابة أشجارها بيضاء كالعظام. لا ريح. لا صوت.','بين الجذوع أكوام حطب مرتبة، كأن أحداً جهّزها لك.'],
+   reward:{coal:10,warm:10,text:'جمعتَ الحطب. أحسستَ أن الغابة تراقبك بلطف.'}},
+  {id:'violin',title:'عازف الكمان',prop:{k:'violin'},
+   lines:['على رصيف محطة قديمة رجل جالس يعزف. تجمّد قبل أن ينهي القوس.','أمامه علبة كمان مفتوحة، وفيها أوراق نقدية صارت جليداً.'],
+   q:'الكمان ما زال سليماً.',
+   a:{t:'خذ الكمان',res:{flag:'violin',warm:20,text:'لفّتْه يداك ببطانية. قد يحتاج أحدهم إلى لحن.'}},
+   b:{t:'ضع نقودك في العلبة',res:{warm:30,text:'صوت رنين خافت. كأن عزفه استمرّ لحظة.'}}},
+  {id:'icebreaker',title:'كاسحة الجليد',prop:{k:'ship'},
+   lines:['سفينة كاسحة عالقة في الجليد، وجدرانها مليئة بالخرائط.','دفتر القبطان: «الشمس تغيب حول خط الأفق الشرقي. إن بقيتَ على الخط الجنوبي، ستصل إلى الدفء.»'],
+   reward:{scrap:10,text:'أخذتَ خرائط، وقطع محرك، وجملة تُقال لنفسك عند التعب.'}},
+  {id:'post',title:'مكتب البريد',prop:{k:'house',lit:0,chimney:0,row:1},
+   lines:['مكتب بريد مغلق. الرسائل في صناديق مرتّبة حسب المدن.','كل صندوق عليه اسم مدينة، وكثيرٌ منها لم تعد موجودة.'],
+   q:'رسائل ما زالت في الانتظار.',
+   a:{t:'احمل الرسائل معك',res:{flag:'letters',scrap:2,text:'ثقلت الحقيبة. لكنها ستصل. لا بدّ أن تصل.'}},
+   b:{t:'خذ الحديد من الصناديق',res:{scrap:7,text:'الحديد جيد. لم تقرأ العناوين.'}}},
+  {id:'wedding',title:'الطاولة الطويلة',prop:{k:'tree'},
+   lines:['طاولة طويلة في وسط الساحة وعليها صحون وأكواب وفستان أبيض فوق مقعد.','حفلٌ لم ينتهِ. زينته تلمع بالجليد.'],
+   q:'كأس مرفوع في أول الطاولة.',
+   a:{t:'ارفع الكأس معهم',res:{warm:50,text:'نخبٌ صامت. أحسستَ بالحرارة تعود إلى عروقك.'}},
+   b:{t:'اجمع الأواني النحاسية',res:{scrap:8,text:'رنّت الأواني. كانت أخفّ مما تتوقع.'}}}
+  ];
+  const i=STORY_DEFS.findIndex(d=>d.id==='village');
+  STORY_DEFS.splice(i<0?STORY_DEFS.length-2:i,0,...NEW);
+  genWorld(7);
+})();
+// ---------- upgrades ----------
+UPG.push(
+ {id:'shield',name:'درع الإشعاع',next:['صفائح رصاص على الهيكل (إشعاع أقل ٣٥٪)','طبقة ثانية (إشعاع أقل ٦٠٪)'],costs:[25,50]},
+ {id:'cleats',name:'عجلات مسنّنة',next:['توزّع الوزن على الجليد (تشقّق أقل ٣٠٪)','توزيع أمثل (تشقّق أقل ٥٥٪)'],costs:[18,40]},
+ {id:'storm',name:'ألواح ضد العواصف',next:['تقلّل دفع الريح والضرر ٢٥٪','تقلّلهما ٥٠٪'],costs:[28,55]},
+ {id:'airb',name:'مكبح هوائي احتياطي',next:['يثبّت القطار أمام الإعصار بقوة أكبر'],costs:[30]},
+ {id:'search',name:'كشّاف بعيد المدى',next:['ينذر بالمناطق الخطرة أبكر (+٣٠٠ م)','أبكر أكثر (+٦٠٠ م)'],costs:[14,32]},
+ {id:'xchg',name:'مبادل حراري',next:['يعيد تدوير الحرارة (برد المقصورة −١٥٪)','يعيد تدويراً أكبر (−٣٠٪)'],costs:[22,48]},
+ {id:'boiler',name:'غلاية مُحسّنة',next:['استهلاك فحم أقل ٨٪','أقل ١٥٪'],costs:[24,50]},
+ {id:'thermos',name:'عزل المقصورة بالصوف',next:['يرفع دفء الفرن على جسمك ٢٠٪'],costs:[20]}
+);
+// ---------- endings by what you did on the way ----------
+function hopeScore(){const f=S.flags||{};return ['plant','cat','seeds','letters','signal','music','violin','layla','fox','mercy','drawings','hope','bell'].reduce((a,k)=>a+(f[k]?1:0),0);}
+function startOutro(){
+  const f=S.flags||{},H=hopeScore(),greed=!!f.greed;
+  OUTRO.length=0;
+  if(H>=7&&!greed){
+    OUTRO.push('خفّ الثلج حول العجلات. ثم ذاب. ثم رأيتُ العشب.','في الوادي كان الناس. وفي المقدمة امرأة تلوّح بمصباح: «ليلى». ابتسمتْ كأنها تعرفني منذ سنين.');
+    if(f.seeds)OUTRO.push('فتحتُ علبة البذور. أول حفنة وُضعت في الدفيئة، ونبتت قبل المساء.');
+    if(f.letters)OUTRO.push('وزّعتُ الرسائل. بعضها وجد أصحابه، وبعضها قُرئ بصوتٍ عالٍ لمن لا اسم له.');
+    if(f.violin||f.music)OUTRO.push('عزفتُ لهم لحناً على الكمان القديم. رقص الأطفال حول النار.');
+    if(f.cat||f.fox||f.plant)OUTRO.push('القطار صار بيتاً. فيه نبتة تنمو، وصديق صغير يخرخر.');
+    OUTRO.push('لم نكن آخر قطار. كنّا أول فجر.');
+  }else if(H>=3){
+    OUTRO.push('خفّ الثلج حول العجلات. ثم ذاب. ثم رأيتُ العشب.','في الوادي كان الناس. قليلون، متعبون، لكنهم أحياء. أشعلوا نيراناً وانتظروا من يصل.');
+    if(f.signal)OUTRO.push('إشارتي وصلت إليهم قبل أن أصل. استقبلوني بدفء من يعرف الاسم.');
+    OUTRO.push('وقفتُ في الباب أنظر إلى القطار الذي حملني. كان يبدو أصغر مما أذكر.','ما زلتُ أحتفظ بالمجرفة. قد يحتاج العالم إلى من يعرف كيف يُبقي النار مشتعلة.');
+  }else{
+    OUTRO.push('وصلتُ. خفّ الثلج، لكن الوادي كان هادئاً أكثر مما يلزم.','نيران قليلة، وأناس نصف نائمين. لم يسألني أحد عن اسمي.');
+    if(greed)OUTRO.push('الفحم الذي جمعتُه كان وافراً… أكثر مما يحتاجه من تبقّى. أدركتُ أن جزءاً منه كان يخصّ غيري.');
+    OUTRO.push('جلستُ بجانب النار. لم أتكلم. وفي الليل سمعتُ في الأفق صافرة قطار آخر… ربما هو الصدى.');
+  }
+  outI=0;renderOutro();
+}
 
 function flames(x,y,w,h,k){
   const n=5;
