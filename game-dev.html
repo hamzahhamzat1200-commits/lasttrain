@@ -2457,6 +2457,7 @@ function openSettings(back){
     '<div class="uc"><div class="un"><b>'+T('مستوى الصوت')+'</b><span class="lv" id="vV">'+Math.round(CFG.vol*100)+'</span></div><input type="range" id="rV" min="0" max="100" value="'+Math.round(CFG.vol*100)+'"></div>'+
     '<div class="uc"><div class="un"><b>'+T('مستوى الموسيقى')+'</b><span class="lv" id="vM">'+Math.round(CFG.music*100)+'</span></div><input type="range" id="rM" min="0" max="100" value="'+Math.round(CFG.music*100)+'"></div>'+
     '<div class="uc"><label class="chk"><input type="checkbox" id="cMute"'+(muted?' checked':'')+'> '+T('كتم الصوت')+'</label></div>'+
+    '<div class="uc"><div class="un"><b>'+(CFG.lang==='en'?'About / Credits':'حول اللعبة')+'</b></div><p style="font-size:12px;line-height:1.7;opacity:.85">آخر قطار — تطوير: Hamzawe1200<br>الأصوات (من Freesound): «On a Train» — unfa · «Fire Crackling 02» — kingsrow · «Reweissenfels» — blaukreuz. جميعها معدّلة ومقطّعة، وحقوقها لأصحابها حسب تراخيصها على freesound.org.<br>الموسيقى والمؤثرات الأخرى مُولَّدة داخل اللعبة.</p></div>'+
     '</div><div class="pf"><button type="button" class="btn" id="setBack">'+T('رجوع')+'</button></div></div>');
   ovEl.querySelectorAll('.sg').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.k;CFG[k]=k==='lang'?b.dataset.v:+b.dataset.v;saveCfg();if(k==='lang')applyLang();openSettings(back);}));
   $('rV').addEventListener('input',e=>{CFG.vol=e.target.value/100;$('vV').textContent=e.target.value;applyVol();saveCfg();});
