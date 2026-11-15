@@ -2,27 +2,53 @@ name: Build APK
 on:
   workflow_dispatch:
   push:
+    branches: [main]
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-      - uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: "11076708"
-          packages: "platform-tools platforms;android-34 build-tools;34.0.0"
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 8.7
-      - name: Create the Android project around game.html
+      - name: Get repository files
+        run: git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" src
+
+      - name: Check game.html
+        run: |
+          cd src
+          test -s game.html || { echo "game.html is missing"; exit 1; }
+          head -c 200 game.html | grep -qi '<!doctype html' || { echo "game.html has no doctype - upload the newest game.html"; exit 1; }
+          grep -q 'name="viewport"' game.html || { echo "game.html has no viewport - upload the newest game.html"; exit 1; }
+
+      - name: Set up Java and Android SDK
+        run: |
+          JH="${JAVA_HOME_17_X64:-}"
+          if [ -z "$JH" ]; then JH="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"; fi
+          echo "JAVA_HOME=$JH" >> "$GITHUB_ENV"
+          export JAVA_HOME="$JH"
+          java -version
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          SM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$SM" || SM="$(command -v sdkmanager)"
+          yes | "$SM" --licenses > /dev/null || true
+          "$SM" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Set up Gradle 8.9
+        run: |
+          curl -fsSL --retry 5 --retry-delay 3 -o gradle.zip https://services.gradle.org/distributions/gradle-8.9-bin.zip
+          unzip -q gradle.zip
+          echo "$PWD/gradle-8.9/bin" >> "$GITHUB_PATH"
+
+      - name: Create the Android project
         run: |
           mkdir -p P/app/src/main/assets P/app/src/main/java/com/lasttrain/game
-          cp game.html P/app/src/main/assets/index.html
+          cp src/game.html P/app/src/main/assets/index.html
           cd P
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          echo "org.gradle.jvmargs=-Xmx2g" > gradle.properties
+          echo "android.useAndroidX=false" >> gradle.properties
           cat > settings.gradle <<'EOT'
           pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement { repositories { google(); mavenCentral() } }
@@ -30,25 +56,37 @@ jobs:
           include ':app'
           EOT
           cat > build.gradle <<'EOT'
-          plugins { id 'com.android.application' version '8.5.2' apply false }
+          plugins { id 'com.android.application' version '8.7.3' apply false }
           EOT
-          echo "org.gradle.jvmargs=-Xmx2g" > gradle.properties
           cat > app/build.gradle <<'EOT'
           plugins { id 'com.android.application' }
           android {
               namespace 'com.lasttrain.game'
               compileSdk 34
-              defaultConfig { applicationId 'com.lasttrain.game'; minSdk 24; targetSdk 34; versionCode 1; versionName '1.0' }
-              compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+              defaultConfig {
+                  applicationId 'com.lasttrain.game'
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName '1.0'
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
           }
           EOT
           cat > app/src/main/AndroidManifest.xml <<'EOT'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
+              <queries>
+                  <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+              </queries>
               <application
                   android:label="آخر قطار"
                   android:supportsRtl="true"
+                  android:allowBackup="true"
                   android:hardwareAccelerated="true"
                   android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
                   <activity
@@ -69,20 +107,47 @@ jobs:
 
           import android.app.Activity;
           import android.graphics.Color;
+          import android.os.Build;
           import android.os.Bundle;
+          import android.speech.tts.TextToSpeech;
+          import android.speech.tts.UtteranceProgressListener;
+          import android.webkit.JavascriptInterface;
           import android.view.View;
           import android.view.WindowManager;
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
+          import java.util.Locale;
 
           public class MainActivity extends Activity {
               private WebView web;
+              private TextToSpeech tts;
+              private boolean ttsOk = false;
+
+              private void jsDone() {
+                  runOnUiThread(new Runnable() {
+                      @Override public void run() {
+                          if (web != null) web.evaluateJavascript("window.__ttsDone&&window.__ttsDone()", null);
+                      }
+                  });
+              }
+
+              private class Bridge {
+                  @JavascriptInterface public boolean ready() { return ttsOk; }
+                  @JavascriptInterface public void speak(String text) {
+                      if (tts != null && ttsOk) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "lt");
+                  }
+                  @JavascriptInterface public void stop() { if (tts != null) tts.stop(); }
+              }
 
               @Override
               protected void onCreate(Bundle b) {
                   super.onCreate(b);
                   getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                  if (Build.VERSION.SDK_INT >= 28) {
+                      getWindow().getAttributes().layoutInDisplayCutoutMode =
+                          WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                  }
                   web = new WebView(this);
                   web.setBackgroundColor(Color.parseColor("#060d19"));
                   WebSettings s = web.getSettings();
@@ -90,8 +155,28 @@ jobs:
                   s.setDomStorageEnabled(true);
                   s.setMediaPlaybackRequiresUserGesture(false);
                   s.setAllowFileAccess(true);
+                  s.setSupportZoom(false);
+                  s.setBuiltInZoomControls(false);
                   web.setWebViewClient(new WebViewClient());
                   web.setOverScrollMode(View.OVER_SCROLL_NEVER);
+                  web.setVerticalScrollBarEnabled(false);
+                  web.setHorizontalScrollBarEnabled(false);
+                  web.addJavascriptInterface(new Bridge(), "AndroidTTS");
+                  tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+                      @Override public void onInit(int status) {
+                          if (status != TextToSpeech.SUCCESS) return;
+                          int r = tts.setLanguage(new Locale("ar"));
+                          if (r < TextToSpeech.LANG_AVAILABLE) return;
+                          tts.setSpeechRate(0.85f);
+                          tts.setPitch(0.8f);
+                          tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                              @Override public void onStart(String id) { }
+                              @Override public void onDone(String id) { jsDone(); }
+                              @Override public void onError(String id) { jsDone(); }
+                          });
+                          ttsOk = true;
+                      }
+                  });
                   setContentView(web);
                   web.loadUrl("file:///android_asset/index.html");
                   immersive();
@@ -105,14 +190,20 @@ jobs:
               }
 
               @Override public void onWindowFocusChanged(boolean f) { super.onWindowFocusChanged(f); if (f) immersive(); }
-              @Override protected void onPause() { super.onPause(); web.onPause(); }
+              @Override protected void onPause() { super.onPause(); web.onPause(); if (tts != null) tts.stop(); }
+              @Override protected void onDestroy() { if (tts != null) { tts.shutdown(); } super.onDestroy(); }
               @Override protected void onResume() { super.onResume(); web.onResume(); }
               @Override public void onBackPressed() { moveTaskToBack(true); }
           }
           EOT
-      - name: Build
-        run: cd P && gradle assembleDebug --no-daemon
-      - uses: actions/upload-artifact@v4
-        with:
-          name: LastTrain-apk
-          path: P/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Build APK
+        run: |
+          cd P
+          gradle assembleDebug --no-daemon --stacktrace
+          ls -l app/build/outputs/apk/debug/
+
+      - name: Publish APK as a release
+        run: |
+          cp P/app/build/outputs/apk/debug/app-debug.apk LastTrain.apk
+          gh release create "apk-${GITHUB_RUN_NUMBER}" LastTrain.apk --repo "$GITHUB_REPOSITORY" --title "LastTrain APK #${GITHUB_RUN_NUMBER}" --notes "Download LastTrain.apk and install it on your phone."
