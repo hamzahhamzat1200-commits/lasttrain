@@ -1,5 +1,7 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>آخر قطار</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -2930,6 +2932,9 @@ function frame(ts){
 fit();camera(0,true);
 showScreen("آخر قطار","الكوكب تجمّد. بقي قطار واحد، وفحم قليل، وأملٌ بعيد.",true,menuButtons());
 requestAnimationFrame(frame);
-window.__dbg={S:()=>S,zt:v=>{ZT=v;},Z:()=>({STATIONS,BREAKS,DRIFTS,CRATES,ICES,DEEPS,FOGS,WOWS,CRIT,BLOCKS})};
+window.__back=()=>{
+  if(mode==='play'&&S){if(S.modal==='pause')resumeGame();else openPause();return true;}
+  return false;
+};
 })();
 </script>
