@@ -296,6 +296,7 @@ function genWorld(seed){
   d=400;while(d<GOAL){SCENES.push({x:Math.round(d+ur(0,400)),k:Math.floor(R()*12),s:+ur(.8,1.4).toFixed(2),par:.55});d+=ur(700,1500);}
   STATIONS.sort((a,b)=>a-b);BREAKS.sort((a,b)=>a-b);DRIFTS.sort((a,b)=>a[0]-b[0]);STORIES.sort((a,b)=>a.x-b.x);WRECKS.sort((a,b)=>a.x-b.x);
   buildElev();
+  if(typeof genZones==='function')genZones();
 }
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -913,7 +914,7 @@ function update(dt){
     if(S.coalPile>4)S.said.low=0;
     if(nb2!==null&&dist<bellR-10&&dist>bellR-60&&!S.said['b'+nb2]){S.said['b'+nb2]=1;say('الجرس يرنّ: سكة مقطوعة أمامنا.',4200);}
   }
-  tutorialTick(dt);alertsTick(dt);hurTick(dt);
+  tutorialTick(dt);alertsTick(dt);hurTick(dt);zTick(dt);
   charStep(dt,dirIn);
 
   /* end conditions */
@@ -1244,6 +1245,7 @@ function drawStation0(i){
     if(lit){ctx.fillStyle='#04070b';ctx.beginPath();ctx.moveTo(cx+1,cy);ctx.lineTo(cx+4,cy-4);ctx.lineTo(cx+9,cy-3);ctx.lineTo(cx+13,cy-4);ctx.lineTo(cx+15,cy);ctx.fill();}
   }
   if(lit){ctx.save();ctx.globalCompositeOperation='lighter';glow(x+172,GY-118,100,'255,160,90',.32);glow(x-198,GY-118,100,'255,160,90',.32);glow(x-30,GY-158,90,'255,150,80',.2);ctx.restore();}
+  stationShelter(i,x,s,lit);
   stationGuide(x,s,lit);
 }
 function drawGoal0(){
@@ -3295,6 +3297,159 @@ function hurricaneOverlay(){
 }
 window.__hur=HUR;
 
+/* ===== v18: regions with their own driving style (radiation leak, thin ice, avalanche valley), the Last Broadcast story, sheltered stations ===== */
+var RADS=[],THINS=[],AVALS=[];
+function genZones(){
+  RADS=[];THINS=[];AVALS=[];
+  const R=mulberry(777),ur=(a,b)=>a+R()*(b-a);
+  const all=()=>RADS.concat(THINS,AVALS);
+  const free=(x0,x1)=>!(STATIONS.some(s=>x0<s+TENDER_OFF+800&&x1>s-1000)||BREAKS.some(b=>b>x0-500&&b<x1+500)||BLOCKS.some(b=>b.x>x0-500&&b.x<x1+500)||DRIFTS.some(z=>z[1]>x0-400&&z[0]<x1+400)||STORIES.some(s=>s.x>x0-500&&s.x<x1+500)||WOWS.some(w=>(w.k==='tunnel'||w.k==='bridge')&&w.x1>x0-300&&w.x0<x1+300)||all().some(z=>z[1]>x0-2500&&z[0]<x1+2500));
+  const gen=(arr,start,gmin,gmax,lmin,lmax)=>{let d=start;while(d<GOAL-9000){const len=Math.round(ur(lmin,lmax));let x0=Math.round(d),t=0;while(t++<60&&!free(x0,x0+len))x0+=400;if(x0+len<GOAL-6000)arr.push([x0,x0+len]);d=x0+len+ur(gmin,gmax);}};
+  gen(THINS,15000,24000,40000,700,1100);
+  gen(AVALS,29000,26000,44000,1100,1700);
+  gen(RADS,43000,28000,46000,1000,1600);
+}
+genZones();
+const ZINFO={
+  thin:{arr:()=>THINS,title:'منطقة الجليد الرقيق',how:'جليد رقيق تحت السكة! سِر ببطء وبثبات (سرعة منخفضة) ولا تفرمل بعنف، وإلا ينشقّ تحتك.'},
+  aval:{arr:()=>AVALS,title:'وادي الانهيارات',how:'وادي الانهيارات الثلجية: لا تتوقف ولا تبطئ هنا. حافظ على سرعة متوسطة إلى عالية حتى تخرج منه.'},
+  rad:{arr:()=>RADS,title:'منطقة التسرّب الإشعاعي',how:'مشاعل خضراء على السكة: إشعاع متسرّب! اندفع بأقصى سرعة، فالبطء يُذيب الهيكل.'}
+};
+const STORY_BEATS=[
+ {f:.015,lines:['...(تشويش)... هنا محطة الفجر. إن كان أحدٌ يسمع... القطار الأخير... نحن نشعل الفرن كل ليلة.']},
+ {f:.12,lines:['سمّوها «الليلة الطويلة». ثار بركان بعيد، وغطّى الرماد الشمس.','ظنّنا أنه شتاءٌ عابر. كان النهاية.']},
+ {f:.24,lines:['المدن لم تمت من البرد وحده.','ماتت حين توقّف الناس عن حمل بعضهم بعضاً.']},
+ {f:.36,lines:['التقطنا إشارة قطارٍ على الخط الغربي. هل هذا أنت؟','انتبه: مفاعل الشمال يتسرّب منذ الليلة الأولى. لا تبطئ قرب المشاعل الخضراء.']},
+ {f:.50,lines:['نصف الطريق. لا أعرف اسمك.','لكنني أترك لك ضوءاً في النافذة كل مساء.']},
+ {f:.64,lines:['الغيمة تتمزّق عند القمم. رأينا شعاعاً من الشمس أمس.','دقيقة واحدة فقط. لم يصدّقني أحد.']},
+ {f:.80,lines:['فرننا يكفي ثلاثين شخصاً. لا تقلق من الازدحام.','ما بقي منّا إلا القليل.']},
+ {f:.93,lines:['أراك على الأفق! أشعلتُ المنارة.','إن بقيت النار حيّة... ستصل.']}
+];
+let _zt={said:{},crack:0,avT:0,gT:0,iT:0,rT:0,hit:0,wasIn:{},warmSaid:0};
+function zNow(){return {rad:zoneAt(RADS,S.d,120,160),thin:zoneAt(THINS,S.d,120,160),aval:zoneAt(AVALS,S.d,120,160)};}
+function zTick(dt){
+  if(S.tut||mode!=='play')return;
+  const Z=_zt,v=Math.abs(S.v),z=zNow();S.zr=z;
+  // announce a region 600 m before its start (and once inside)
+  for(const k in ZINFO){
+    for(const a of ZINFO[k].arr()){
+      const key=k+a[0];
+      if(S.d>a[0]-650&&S.d<a[0]+60&&!Z.said[key]){Z.said[key]=1;alertSay(ZINFO[k].how,8500,k==='rad'?'fire':'cold');try{tone(k==='rad'?880:520,.25,.06,'square');}catch(e){}}
+    }
+    const inz=z[k]>.5;if(Z.wasIn[k]&&!inz&&!S.broke){alertSay(k==='rad'?'عبرنا الإشعاع. الهواء هنا أنظف.':k==='thin'?'خرجنا من الجليد الرقيق.':'خرجنا من الوادي سالمين.',4200,'info');}Z.wasIn[k]=inz;
+  }
+  // ----- radiation: slow = the hull melts -----
+  if(z.rad>.05){
+    const slow=Math.max(0,Math.min(1,(24-v)/16));
+    S.hull-=z.rad*slow*1.9*dt;
+    Z.gT-=dt;if(Z.gT<=0){Z.gT=.5/(.1+z.rad*(.6+slow*2.2))*(.5+Math.random());try{burst(3400,.012,.07,6);}catch(e){}}
+    if(slow>.45&&z.rad>.5&&(Z.rT-=dt)<=0){Z.rT=6;alertSay('الهيكل يذوب! أسرِع!',3200,'fire');}
+    if(slow>.3)S.shake=Math.max(S.shake||0,.08*z.rad);
+  }
+  // ----- thin ice: heavy and fast cracks it -----
+  if(z.thin>.05){
+    const hv=Math.max(0,Math.min(1,(v-9)/12)),hb=(S.brake>.5&&v>6)?.8:0;
+    Z.crack=Math.max(0,Math.min(1.2,Z.crack+(z.thin*(hv*.3+hb*.5)-.05*(1-hv))*dt));
+    Z.iT-=dt;if(Z.iT<=0&&z.thin>.3){Z.iT=rnd(.5,1.8)/(.4+Z.crack*2);try{tone(rnd(280,800),.3,.03+.04*Z.crack,'sine',rnd(120,420));if(Z.crack>.4)burst(rnd(1600,2600),.08,.12*Z.crack,3);}catch(e){}}
+    if(Z.crack>.65&&!Z.said.crk){Z.said.crk=1;alertSay('الجليد يتشقّق تحت العجلات! أبطئ بهدوء.',4200,'cold');}
+    if(Z.crack<.3)Z.said.crk=0;
+    if(Z.crack>=1){Z.crack=.35;S.hull-=22;S.v*=.25;S.shake=1;S.flash=.6;try{burst(300,.7,.4,.8);tone(55,.5,.25,'sawtooth',32);}catch(e){}alertSay('انشقّ الجليد تحت القطار!',4200,'fire');}
+  }else Z.crack=Math.max(0,Z.crack-dt*.2);
+  // ----- avalanche valley: stop or crawl and the mountain comes down -----
+  if(z.aval>.1&&v<12)Z.avT+=dt*z.aval;else Z.avT=Math.max(0,Z.avT-dt*1.5);
+  if(z.aval>.1&&Z.avT>1.5&&(Z.avRum=(Z.avRum||0)-dt)<=0){Z.avRum=rnd(.7,1.6);try{burst(70,.9,.12+.03*Z.avT,.6);}catch(e){}}
+  if(Z.avT>3&&!Z.said.avw){Z.said.avw=1;alertSay('الجبل يرتجف! تحرّك فوراً!',3600,'fire');}
+  if(Z.avT<1)Z.said.avw=0;
+  if(Z.avT>8){Z.avT=2;Z.hit=1.6;S.hull-=18;S.warm=Math.max(0,S.warm-12);S.coalPile=Math.max(0,S.coalPile-2);S.v*=.3;S.shake=1;S.flash=.6;try{burst(90,1.4,.4,.5);tone(50,.8,.25,'sawtooth',30);}catch(e){}alertSay('انهيار ثلجي! ضربنا الجبل.',4200,'fire');}
+  Z.hit=Math.max(0,Z.hit-dt);
+  // ----- sheltered stations: heated platform warms the player on foot -----
+  if(S.ground){for(const s of STATIONS){if(Math.abs(S.gd-s)<140){S.warm=Math.min(100,S.warm+3.4*dt);if(!Z.warmSaid){Z.warmSaid=1;alertSay('الرصيف دافئ: سخّانات المحطة تعمل.',4200,'info');}break;}}}else Z.warmSaid=0;
+  // ----- the Last Broadcast -----
+  const f=S.d/GOAL;
+  for(let i=0;i<STORY_BEATS.length;i++){const b=STORY_BEATS[i];
+    if(f>=b.f&&f<b.f+.04&&!S.said['bt'+i]&&!(HUR&&HUR.str>.2)){S.said['bt'+i]=1;playBeat(b);break;}}
+}
+function playBeat(b){
+  try{burst(2800,.5,.07,.8);tone(660,.12,.05,'sine');setTimeout(()=>tone(990,.12,.05,'sine'),140);}catch(e){}
+  b.lines.forEach((ln,i)=>setTimeout(()=>{if(mode==='play'){alertSay('📻 '+ln,6400,'info');try{burst(3000,.18,.04,.8);}catch(e){}}},i*6700));
+}
+// ---- drawing ----
+function drawZonesFx(){
+  const t=S.t;
+  for(const a of RADS){
+    if(sxw(a[1])<WINL-300||sxw(a[0])>WINR+300)continue;
+    for(let x=Math.ceil(a[0]/55)*55;x<=a[1];x+=55){
+      const sx=sxw(x);if(sx<WINL-40||sx>WINR+40)continue;
+      const e=Math.min(1,(x-a[0])/120)*Math.min(1,(a[1]-x)/120);if(e<=0)continue;
+      const k=Math.round(x/55)%2,fl=.75+.25*Math.sin(t*11+x),by=GY+(k?16:10),sc=k?1:.88;
+      ctx.save();ctx.translate(0,ey(x));
+      ctx.strokeStyle='#2a343c';ctx.lineWidth=3*sc;ctx.beginPath();ctx.moveTo(sx,by);ctx.lineTo(sx,by-44*sc);ctx.stroke();
+      ctx.fillStyle='#3a464f';ctx.fillRect(sx-5*sc,by-47*sc,10*sc,5*sc);
+      const fh=(16+8*Math.sin(t*9+x*.3))*sc*fl;
+      ctx.fillStyle='rgba(120,255,70,.9)';ctx.beginPath();ctx.moveTo(sx-5*sc,by-47*sc);ctx.quadraticCurveTo(sx-6*sc,by-47*sc-fh*.6,sx,by-47*sc-fh);ctx.quadraticCurveTo(sx+6*sc,by-47*sc-fh*.6,sx+5*sc,by-47*sc);ctx.fill();
+      ctx.fillStyle='rgba(235,255,150,.95)';ctx.beginPath();ctx.moveTo(sx-2.5*sc,by-47*sc);ctx.quadraticCurveTo(sx-3*sc,by-47*sc-fh*.45,sx,by-47*sc-fh*.7);ctx.quadraticCurveTo(sx+3*sc,by-47*sc-fh*.45,sx+2.5*sc,by-47*sc);ctx.fill();
+      ctx.globalCompositeOperation='lighter';glow(sx,by-52*sc,70*sc,'120,255,80',.4*e*fl);glow(sx,by,46,'120,255,80',.16*e);
+      ctx.restore();
+    }
+  }
+  // thin ice sheet + cracks under the rails
+  for(const a of THINS){
+    const x0=sxw(a[0]),x1=sxw(a[1]);if(x1<WINL-100||x0>WINR+100)continue;
+    const L=Math.max(WINL-60,x0),Rr=Math.min(WINR+60,x1);if(Rr<=L)continue;
+    ctx.save();ctx.translate(0,ey((a[0]+a[1])/2));
+    const g=lin(0,GY+12,0,GY+90,[[0,'rgba(190,230,250,.5)'],[1,'rgba(90,140,190,.15)']]);ctx.fillStyle=g;ctx.fillRect(L,GY+12,Rr-L,78);
+    ctx.fillStyle='rgba(255,255,255,.18)';for(let i=0;i<8;i++){const gx=L+((i*131+t*14)%(Rr-L));ctx.fillRect(gx,GY+16+i*7%40,26,2);}
+    const cr=_zt.crack;ctx.strokeStyle='rgba(235,248,255,'+(.4+.5*cr)+')';ctx.lineWidth=1+cr;
+    for(let i=0;i<24;i++){const cx=Math.round(a[0]/10)*10+i*(a[1]-a[0])/24,sx=sxw(cx);if(sx<L-40||sx>Rr+40)continue;
+      ctx.beginPath();ctx.moveTo(sx,GY+14);let px=sx,py=GY+14;for(let k=0;k<5;k++){px+=(hash(i*7+k)-.5)*26;py+=10+hash(i*3+k)*10;ctx.lineTo(px,py);}ctx.stroke();}
+    ctx.restore();
+  }
+  // avalanche: loose snow streams down the slopes
+  for(const a of AVALS){
+    if(sxw(a[1])<WINL-200||sxw(a[0])>WINR+200)continue;
+    const z=zoneAt(AVALS,S.d,120,160);if(z<.05)continue;
+    ctx.save();ctx.fillStyle='rgba(235,243,252,'+(.5*z)+')';
+    for(let i=0;i<40;i++){const fx=WINL+hash(i+11)*(WINR-WINL),fy=((hash(i)*320+t*(60+hash(i+4)*120))%360)+GY-330;ctx.fillRect(fx,fy,2+hash(i+2)*3,2+hash(i+2)*3);}
+    ctx.restore();
+  }
+}
+function zonesOverlay(){
+  const z=S.zr||{rad:0,thin:0,aval:0},Z=_zt,t=S.t;
+  if(z.rad>.02){ctx.fillStyle='rgba(110,255,80,'+(.1*z.rad*(.8+.2*Math.sin(t*20)))+')';ctx.fillRect(0,0,CW,CH);
+    ctx.fillStyle='rgba(200,255,170,'+(.12*z.rad)+')';for(let i=0;i<60;i++)ctx.fillRect(Math.random()*CW,Math.random()*CH,1.5,1.5);
+    const g=ctx.createRadialGradient(CW/2,CH/2,Math.min(CW,CH)*.35,CW/2,CH/2,Math.max(CW,CH)*.7);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(40,120,30,'+(.3*z.rad)+')');ctx.fillStyle=g;ctx.fillRect(0,0,CW,CH);}
+  if(z.thin>.02){ctx.fillStyle='rgba(170,215,255,'+(.07*z.thin)+')';ctx.fillRect(0,0,CW,CH);}
+  if(z.aval>.02&&Z.avT>1){const k=Math.min(1,Z.avT/8);ctx.fillStyle='rgba(235,243,252,'+(.12*k)+')';ctx.fillRect(0,0,CW,CH);}
+  if(Z.hit>0){ctx.fillStyle='rgba(240,247,255,'+Math.min(.9,Z.hit/1.6)+')';ctx.fillRect(0,0,CW,CH);}
+}
+// sheltered station: glass-and-steel canopy over the whole platform, warm lamps, heaters with steam
+function stationShelter(i,x,s,lit){
+  const t=S.t,top=GY-232,by=GY-14,hw=700;
+  ctx.save();
+  // glass roof (frosted, warm from inside)
+  const gl=lin(0,top-40,0,top+30,[[0,'rgba(190,225,245,.5)'],[1,'rgba(255,190,120,'+(lit?.32:.08)+')']]);
+  ctx.fillStyle=gl;ctx.beginPath();ctx.moveTo(x-hw,top+36);ctx.quadraticCurveTo(x,top-62,x+hw,top+36);ctx.lineTo(x+hw,top+46);ctx.quadraticCurveTo(x,top-52,x-hw,top+46);ctx.closePath();ctx.fill();
+  // ribs
+  ctx.strokeStyle='#3b566e';ctx.lineWidth=4;
+  // warm interior fill below the roof
+  if(lit){ctx.fillStyle='rgba(255,170,100,.07)';ctx.beginPath();ctx.moveTo(x-hw,by);ctx.lineTo(x-hw,top+46);ctx.quadraticCurveTo(x,top-52,x+hw,top+46);ctx.lineTo(x+hw,by);ctx.closePath();ctx.fill();}
+  for(let k=-5;k<=5;k++){const rx=x+k*(hw/5),ry=top+36-((1-Math.pow(k/5,2))*98)+((1-Math.pow(k/5,2))*0);
+    ctx.beginPath();ctx.moveTo(rx,by);ctx.lineTo(rx,ry+8);ctx.stroke();ctx.fillStyle='#233b52';ctx.fillRect(rx-4,ry+4,8,5);}
+  ctx.strokeStyle='rgba(235,245,250,.85)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x-hw,top+36);ctx.quadraticCurveTo(x,top-62,x+hw,top+36);ctx.stroke();
+  // wind panels at both ends (glass)
+  for(const sd of [-1,1]){ctx.fillStyle='rgba(180,215,235,.14)';ctx.fillRect(x+sd*hw-(sd>0?6:0),top+40,6,by-top-40);}
+  // heaters along the platform: orange coils + rising steam
+  for(let k=-4;k<=4;k++){if(k===0)continue;const hx=x+k*(hw/4.6);
+    ctx.fillStyle='#1a2a3a';ctx.fillRect(hx-9,by-30,18,30);ctx.fillStyle=lit?'rgba(255,140,60,.9)':'#2a3d50';ctx.fillRect(hx-6,by-24,12,3);ctx.fillRect(hx-6,by-17,12,3);ctx.fillRect(hx-6,by-10,12,3);
+    if(lit){ctx.globalCompositeOperation='lighter';glow(hx,by-16,64,'255,150,70',.3);ctx.globalCompositeOperation='source-over';
+      for(let q=0;q<3;q++){const ph=(t*.5+q/3+k*.17)%1;ctx.fillStyle='rgba(225,235,242,'+(.22*(1-ph))+')';ctx.beginPath();ctx.arc(hx+Math.sin(ph*6+k)*6,by-34-ph*60,3+ph*8,0,7);ctx.fill();}}}
+  // string of warm lamps under the canopy
+  if(lit){ctx.strokeStyle='rgba(30,40,50,.8)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(x-hw+30,top+54);for(let k=0;k<=28;k++){const lx=x-hw+30+k*(hw*2-60)/28;ctx.lineTo(lx,top+54+14*Math.sin(k/28*Math.PI*6)*.5+10*Math.sin(k/28*Math.PI));}ctx.stroke();
+    ctx.globalCompositeOperation='lighter';for(let k=0;k<=28;k+=2){const lx=x-hw+30+k*(hw*2-60)/28,ly=top+54+14*Math.sin(k/28*Math.PI*6)*.5+10*Math.sin(k/28*Math.PI);const fl=.85+.15*Math.sin(t*5+k);glow(lx,ly,30,'255,200,120',.32*fl);}}
+  ctx.restore();
+}
+window.__z=()=>({RADS,THINS,AVALS,STATIONS,_zt});
+
 function flames(x,y,w,h,k){
   const n=5;
   for(let i=0;i<n;i++){
@@ -3716,7 +3871,7 @@ function overlays(){
   }
   if(S.flash>0){ctx.fillStyle='rgba(255,80,40,'+(S.flash*.45)+')';ctx.fillRect(0,0,CW,CH);}
   if(S.warm<18){const k=(1-S.warm/18)*(.45+.2*Math.sin(S.t*5));ctx.fillStyle='rgba(8,20,40,'+(k*.6)+')';ctx.fillRect(0,0,CW,CH);}
-  try{hurricaneOverlay();bodyTempHUD();}catch(e){}
+  try{zonesOverlay();hurricaneOverlay();bodyTempHUD();}catch(e){}
 }
 function render(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
@@ -3735,7 +3890,7 @@ function render(){
   for(let i=0;i<STATIONS.length;i++)drawStation(i);
   drawGoal();drawTunnelBack();drawTrack();drawDrifts();drawBreaks();drawBlocks();drawDebris();drawSites();drawCreatures();drawWowBack();fogLayer(S.fog,false);
   ctx.save();ctx.translate(0,Math.sin(S.t*38)*S.bump*1.4);
-  ctx.save();trainScale();drawHeap();drawRearCars();ctx.save();ctx.translate(TL,0);beginPose(locoPose());ctx.translate(-TL,0);drawTrain();drawUpgrades();drawStoke();drawHurTrain();drawCabExtras();drawCabBrake();drawGauges();drawCargo();drawWheelHeat();drawDoorEtc();fireLight();ctx.restore();ctx.restore();if(!S.ground){beginPose(playerPoseP());drawPlayer();ctx.restore();}drawShell();ctx.restore();drawCrates();drawStopFronts();drawLadderMark();if(S.ground)drawGroundPlayer();drawWowFront();
+  ctx.save();trainScale();drawHeap();drawRearCars();ctx.save();ctx.translate(TL,0);beginPose(locoPose());ctx.translate(-TL,0);drawTrain();drawUpgrades();drawStoke();drawHurTrain();drawCabExtras();drawCabBrake();drawGauges();drawCargo();drawWheelHeat();drawDoorEtc();fireLight();ctx.restore();ctx.restore();if(!S.ground){beginPose(playerPoseP());drawPlayer();ctx.restore();}drawShell();ctx.restore();drawCrates();drawStopFronts();drawLadderMark();drawZonesFx();if(S.ground)drawGroundPlayer();drawWowFront();
   ctx.restore();
   drawTargetMarker();drawPromptTag();
   ctx.restore();
