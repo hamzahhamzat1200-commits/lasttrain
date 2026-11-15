@@ -1084,7 +1084,7 @@ function end(r){
 }
 
 /* ---------- fit & camera ---------- */
-let CW=960,CH=540,SC=1,PORTRAIT=false,CAMX=100,CAMY=100,VWIN=720,WINL=60,WINR=860,DPR=Math.min(2,window.devicePixelRatio||1);
+let CW=960,CH=540,SC=1,PORTRAIT=false,CAMX=100,CAMY=100,VWIN=720,WINL=60,WINR=860,DPR=Math.min(3,window.devicePixelRatio||1);
 const stageEl=$('stage'),frameEl=$('frame'),touchEl=$('touch');
 function fit(){
   const sw=stageEl.clientWidth,sh=stageEl.clientHeight;
@@ -1097,7 +1097,7 @@ function fit(){
   else{w=Math.min(sw,availH*16/9);h=w*9/16;}
   w=Math.max(220,w);h=Math.max(150,h);
   frameEl.style.width=w+'px';frameEl.style.height=h+'px';
-  CW=w;CH=h;DPR=Math.min(2,window.devicePixelRatio||1);
+  CW=w;CH=h;DPR=Math.min(3,window.devicePixelRatio||1);
   cv.width=Math.round(w*DPR);cv.height=Math.round(h*DPR);
   $('sub').style.fontSize=clamp(w*.03,12,17)+'px';
 }
@@ -3748,7 +3748,7 @@ setInterval(()=>{
 },500);
 // ---------- pseudo-3D depth ----------
 let _frameDt=.016;
-const FX3={on:true,acc:0,n:0,bl:null,bx:null};
+window.__keepFx=true;const FX3={on:true,acc:0,n:0,bl:null,bx:null};
 function fogBand(y0,y1,a,rgb){
   const g=ctx.createLinearGradient(0,y0,0,y1);rgb=rgb||'120,165,200';
   g.addColorStop(0,'rgba('+rgb+',0)');g.addColorStop(.62,'rgba('+rgb+','+a+')');g.addColorStop(1,'rgba('+rgb+',0)');
@@ -3808,7 +3808,7 @@ function bloomPass(dt){
   if(!FX3.on||!window.CanvasRenderingContext2D||typeof ctx.filter==='undefined')return;
   // adaptive: drop bloom if the device cannot keep up
   FX3.acc+=dt;FX3.n++;if(FX3.n>=90){if(FX3.acc/FX3.n>.034&&!window.__keepFx)FX3.on=false;FX3.acc=0;FX3.n=0;}
-  const w=Math.max(8,cv.width>>2),h=Math.max(8,cv.height>>2);
+  const w=Math.max(8,cv.width>>1),h=Math.max(8,cv.height>>1);
   if(!FX3.bl){FX3.bl=document.createElement('canvas');FX3.bx=FX3.bl.getContext('2d');}
   if(FX3.bl.width!==w||FX3.bl.height!==h){FX3.bl.width=w;FX3.bl.height=h;}
   const b=FX3.bx;b.setTransform(1,0,0,1,0,0);b.clearRect(0,0,w,h);b.filter='contrast(1.9) brightness(.85) blur(2px)';b.drawImage(cv,0,0,w,h);b.filter='none';
