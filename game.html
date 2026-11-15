@@ -767,7 +767,7 @@ function update(dt){
   S.fog=fogAt(S.d);S.ice=iceAt(S.d);S.deep=deepAt(S.d);S.aur=auroraAt(S.d);S.tun=wowAt('tunnel',S.d)?1:0;
   updateCreatures(dt);
   if(S.mem){S.mem.t+=dt;if(S.mem.t>6)S.mem=null;}
-  S.storm=stormAt(S.d);
+  S.storm=Math.max(stormAt(S.d),hurStr());
   S.rime=clamp(S.rime+((S.ice*.05+S.deep*.06+S.storm*.02)-S.Tf*.06*(S.air>.5?1:.4)-.004-(S.warm>55?(S.warm-55)/45*.035:0))*dt,0,1);
   { const hot=clamp(S.Tf*3,0,1);
     const lk=(S.doorWant?.035:.006)*(1+S.storm*.6+S.deep*1.2+S.ice*.5)*(1+av*.01);
@@ -793,8 +793,9 @@ function update(dt){
   const aBr=S.brake*3.3*(1+.2*L('brakes'));
   const sg=S.v>.03?1:S.v<-.03?-1:0;
   let a;
-  if(sg!==0)a=aTr-aGr-sg*(aRes+aDr+(av>.05?aBr:0));
-  else{const n=aTr-aGr,m=aRes+aDr+S.brake*3;a=Math.abs(n)>m?n-Math.sign(n)*m:0;if(a===0)S.v=0;}
+  const aW=hurWindA();
+  if(sg!==0)a=aTr+aW-aGr-sg*(aRes+aDr+(av>.05?aBr:0));
+  else{const n=aTr+aW-aGr,m=aRes+aDr+S.brake*3;a=Math.abs(n)>m?n-Math.sign(n)*m:0;if(a===0)S.v=0;}
   let nv=S.v+a*dt;
   if(sg!==0&&nv*S.v<0&&Math.sign(aTr)!==Math.sign(nv))nv=0;
   S.v=clamp(nv,-7,60);
@@ -860,7 +861,7 @@ function update(dt){
   S.snap=Math.max(0,S.snap-dt);
   const sn=S.snap>0?1.7:1;
   const ins=1-.18*L('insul')-(S.flags.plant?.04:0);
-  const coldFront=(.85+.04*av+1.6*S.storm+1.1*S.ice+1.5*S.deep)*(L('heat')>=3?.8:1),coldCab=.55+.02*av+.45*S.storm+.35*S.ice+.5*S.deep;
+  const coldFront=(.85+.04*av+1.6*S.storm+1.1*S.ice+1.5*S.deep+2.5*hurStr())*(L('heat')>=3?.8:1),coldCab=.55+.02*av+.45*S.storm+.35*S.ice+.5*S.deep+3.0*hurStr();
   const cold=lerp(coldFront,coldCab,shelter)*ins*sn*DF().cold;
   S.warm=clamp(S.warm+(gain-cold)*dt,0,100);
 
@@ -912,7 +913,7 @@ function update(dt){
     if(S.coalPile>4)S.said.low=0;
     if(nb2!==null&&dist<bellR-10&&dist>bellR-60&&!S.said['b'+nb2]){S.said['b'+nb2]=1;say('الجرس يرنّ: سكة مقطوعة أمامنا.',4200);}
   }
-  tutorialTick(dt);alertsTick(dt);
+  tutorialTick(dt);alertsTick(dt);hurTick(dt);
   charStep(dt,dirIn);
 
   /* end conditions */
@@ -2997,7 +2998,7 @@ function smpTick(){
   smpSet('bed',v>.4?(.06+.5*vf)*(out?.55:1):0,.55+.65*vf);
   const fb=SMP.fb||0;SMP.fb=fb*.96;smpSet('fire',(.08+.4*Math.max(0,Math.min(1,S.Tf))+fb*.6)*(out?.25:1));
   const st=Math.max(0,Math.min(1,S.storm||0));
-  smpSet('storm',(.04+.7*st)*(out?1.3:1),.9+.2*st);
+  const hs=(typeof HUR!=='undefined')?HUR.str:0;smpSet('storm',(.04+.7*st+.5*hs)*(out?1.3:1),.9+.2*st+.15*hs);
   smpSet('bliz',.5*st*(out?1.2:1));
   if(mode==='play'){
     // whistle: leaving a stop, and approaching the next station
@@ -3195,6 +3196,104 @@ function menuBgDraw(M,dt){
   // vignette
   const vg=g.createRadialGradient(W/2,H/2,H*.4,W/2,H/2,H*1.0);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.55)');g.fillStyle=vg;g.fillRect(0,0,W,H);
 }
+
+/* ===== v17: random hurricanes: wind pushes the train, brakes must be set, cab heat, damage while moving, metal groans ===== */
+const HUR={ph:0,t:0,cd:-1,str:0,dir:-1,dur:45,loose:[],deb:[],flash:0,gT:2,hT:.5,bT:0,dmgT:0,coalT:0,said:0};
+function hurStr(){return HUR.str;}
+function hurWindA(){return HUR.str>.01?HUR.dir*HUR.str*1.8*(1-.93*S.brake):0;}
+function hurTilt(){const h=HUR.str;if(h<.02)return 0;return Math.sin(S.t*2.7)*.012*h+Math.sin(S.t*7.3)*.006*h+HUR.dir*.012*h;}
+function hurTick(dt){
+  if(S.tut||mode!=='play'){return;}
+  if(HUR.cd<0)HUR.cd=rnd(150,290);
+  const hs=HUR.str;
+  if(HUR.ph===0){
+    HUR.cd-=dt;
+    if(HUR.cd<=0&&S.playT>100&&!S.clim){HUR.ph=1;HUR.t=0;HUR.dir=Math.random()<.65?-1:1;HUR.dur=rnd(38,58);HUR.said=0;
+      alertSay('الريح تعوي من بعيد... إعصار قادم! اسحب المكبح، ارفع حرارة الفرن، وابقَ داخل المقصورة.',7000,'cold');
+      try{metalGroan(.8);}catch(e){}}
+  }else{
+    HUR.t+=dt;
+    if(HUR.ph===1){HUR.str=Math.min(.22,HUR.t/14*.22);if(HUR.t>=14){HUR.ph=2;HUR.t=0;}}
+    else if(HUR.ph===2){const k=Math.min(1,HUR.t/6);HUR.str=.22+.78*k*k*(3-2*k);
+      if(HUR.t>=HUR.dur){HUR.ph=3;HUR.t=0;}}
+    else if(HUR.ph===3){HUR.str=Math.max(0,HUR.str-dt/10);if(HUR.str<=.01){HUR.str=0;HUR.ph=0;HUR.cd=rnd(240,420);alertSay('هدأ الإعصار. الصمت ثقيل... تفقّد القطار وتابع.',5200,'info');}}
+    const h=HUR.str;
+    // push warning
+    if(h>.3&&!S.brkOn&&!S.ground&&Math.abs(S.v)>.3&&!HUR.said){HUR.said=1;alertSay('الإعصار يدفع القطار! اسحب المكبح فوراً.',5000,'fire');}
+    if(h>.3&&S.brkOn)HUR.said=0;
+    // cab heat leaks out
+    S.Tf=Math.max(0,S.Tf-.018*h*dt);
+    // camera/train shake
+    S.shake=Math.max(S.shake||0,.14*h+(h>.6?.06*Math.abs(Math.sin(S.t*9)):0));
+    // damage when forced through it (moving)
+    const av=Math.abs(S.v);
+    if(h>.3&&av>5){
+      S.hull-=h*Math.min(1.4,av/26)*.55*dt;
+      HUR.coalT-=dt;if(HUR.coalT<=0&&S.coalPile>.5){HUR.coalT=rnd(2.5,4.5);S.coalPile=Math.max(0,S.coalPile-.5);for(let i=0;i<5;i++)HUR.deb.push({x:TL+rnd(180,330),y:FLOOR-34,vx:HUR.dir*rnd(160,330),vy:rnd(-120,-30),r:rnd(1.4,3),a:1,coal:1,rot:0,vr:0});}
+      HUR.bT-=dt;if(HUR.bT<=0){HUR.bT=rnd(5,9);S.hull-=1.6;S.shake=.55;S.flash=.25;try{burst(250,.45,.35,.8);tone(60,.35,.22,'sawtooth',38);metalGroan(1);}catch(e){}
+        for(let i=0;i<4;i++)HUR.deb.push({x:TL+rnd(-500,700),y:FLOOR-rnd(90,170),vx:HUR.dir*rnd(240,520),vy:rnd(-160,40),r:rnd(3,7),a:1,plate:1,rot:rnd(0,6),vr:rnd(-9,9)});}
+    }
+    // furniture sliding + papers flying inside the cab
+    if(h>.25&&Math.random()<dt*(2+9*h)){HUR.loose.push({x:TL+rnd(300,640),y:FLOOR-rnd(30,120),vx:HUR.dir*rnd(60,220)*h,vy:rnd(-60,20),rot:rnd(0,6),vr:rnd(-8,8),a:1,k:Math.random()<.6?0:Math.random()<.5?1:2});}
+    // sound: groans, hail on iron, gust booms
+    HUR.gT-=dt;if(HUR.gT<=0&&h>.18){HUR.gT=rnd(1.4,3.6)/(.5+h);try{metalGroan(h);}catch(e){}}
+    HUR.hT-=dt;if(HUR.hT<=0&&h>.3){HUR.hT=rnd(.05,.22)/(.4+h);try{tone(rnd(1500,3600),.04,.04+.05*h,'triangle');burst(rnd(2200,5200),.03,.05,4);}catch(e){}}
+    if(h>.5&&Math.random()<dt*.35){HUR.flash=1;try{burst(120,.8,.28,.7);tone(45,.7,.2,'sine',30);}catch(e){}}
+  }
+  // frames that follow the state
+  HUR.flash=Math.max(0,HUR.flash-dt*2.2);
+  for(let i=HUR.loose.length-1;i>=0;i--){const p=HUR.loose[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=260*dt;p.rot+=p.vr*dt;if(p.y>FLOOR-4){p.y=FLOOR-4;p.vy*=-.35;p.vx*=.85;p.vr*=.6;}p.a-=dt*.22;if(p.a<=0||p.x<TL-560||p.x>TL+720)HUR.loose.splice(i,1);}
+  for(let i=HUR.deb.length-1;i>=0;i--){const p=HUR.deb[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=380*dt;p.rot+=p.vr*dt;p.a-=dt*.6;if(p.a<=0||p.y>GY+6)HUR.deb.splice(i,1);}
+}
+// metal groan: a low saw glide through a resonant band, plus a faint high squeak
+function metalGroan(k){
+  if(!AC||muted)return;
+  const t0=AC.currentTime,dur=1+1.4*Math.random();
+  const o=AC.createOscillator();o.type='sawtooth';o.frequency.setValueAtTime(48+Math.random()*40,t0);o.frequency.exponentialRampToValueAtTime(30+Math.random()*30,t0+dur);
+  const lfo=AC.createOscillator(),lg=AC.createGain();lfo.frequency.value=6+Math.random()*8;lg.gain.value=9;lfo.connect(lg);lg.connect(o.frequency);lfo.start(t0);lfo.stop(t0+dur+.1);
+  const bp=AC.createBiquadFilter();bp.type='bandpass';bp.Q.value=9;bp.frequency.setValueAtTime(160+Math.random()*120,t0);bp.frequency.exponentialRampToValueAtTime(90+Math.random()*60,t0+dur);
+  const g=AC.createGain();g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(.16*Math.min(1,k+.2),t0+dur*.3);g.gain.linearRampToValueAtTime(0,t0+dur);
+  o.connect(bp);bp.connect(g);g.connect(master);o.start(t0);o.stop(t0+dur+.1);
+  // squeal of stressed iron
+  const s=AC.createOscillator();s.type='triangle';const f0=900+Math.random()*900;s.frequency.setValueAtTime(f0,t0);s.frequency.linearRampToValueAtTime(f0*(.8+Math.random()*.5),t0+dur*.7);
+  const sg=AC.createGain();sg.gain.setValueAtTime(0,t0);sg.gain.linearRampToValueAtTime(.025*k,t0+dur*.25);sg.gain.linearRampToValueAtTime(0,t0+dur*.8);
+  const sb=AC.createBiquadFilter();sb.type='bandpass';sb.frequency.value=f0*1.2;sb.Q.value=14;
+  s.connect(sb);sb.connect(sg);sg.connect(master);s.start(t0);s.stop(t0+dur);
+}
+// in the train space (after the cab): loose items and debris
+function drawHurTrain(){
+  if(HUR.loose.length===0&&HUR.deb.length===0)return;
+  ctx.save();
+  for(const p of HUR.loose){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.globalAlpha=Math.min(1,p.a*1.6);
+    if(p.k===0){ctx.fillStyle='#d8d2c0';ctx.fillRect(-4,-3,8,6);ctx.fillStyle='rgba(60,50,40,.5)';ctx.fillRect(-3,-1.5,6,.8);ctx.fillRect(-3,.2,5,.8);}
+    else if(p.k===1){ctx.fillStyle='#4a5560';ctx.fillRect(-3.5,-3,7,6);ctx.fillStyle='#2b343d';ctx.fillRect(-3.5,-3,7,1.6);}
+    else{ctx.strokeStyle='#8a6a48';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-6,0);ctx.lineTo(6,0);ctx.stroke();ctx.fillStyle='#8e9aa3';ctx.fillRect(4,-2,4,4);}
+    ctx.restore();}
+  for(const p of HUR.deb){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.globalAlpha=Math.min(1,p.a*1.5);
+    if(p.coal){ctx.fillStyle='#05080b';ctx.beginPath();ctx.arc(0,0,p.r,0,7);ctx.fill();}
+    else{ctx.fillStyle='#53626f';ctx.fillRect(-p.r*1.6,-p.r*.7,p.r*3.2,p.r*1.4);ctx.fillStyle='#8a99a6';ctx.fillRect(-p.r*1.6,-p.r*.7,p.r*3.2,1);}
+    ctx.restore();}
+  ctx.restore();
+}
+// screen-space: darkness, wind streaks, gust flashes, debris silhouettes
+function hurricaneOverlay(){
+  const h=HUR.str;if(h<.02)return;
+  const t=S.t;
+  ctx.save();
+  ctx.fillStyle='rgba(8,14,26,'+(.38*h)+')';ctx.fillRect(0,0,CW,CH);
+  ctx.strokeStyle='rgba(225,238,250,'+(.18+.3*h)+')';ctx.lineWidth=1+h*1.2;
+  const n=Math.floor(30+90*h),dir=HUR.dir;
+  for(let i=0;i<n;i++){const sp=700+hash(i+3)*900,x=mod((hash(i)*CW*1.6-dir*-1*t*sp*(.5+h)),CW*1.6)-CW*.3,y=hash(i*5+2)*CH,len=60+hash(i+8)*140*h;
+    ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+dir*-len,y+len*.05);ctx.stroke();}
+  if(h>.45){ctx.fillStyle='rgba(235,243,252,'+(HUR.flash*.35)+')';ctx.fillRect(0,0,CW,CH);}
+  // heavy snow blobs hurled across the screen
+  ctx.fillStyle='rgba(235,243,252,'+(.35*h)+')';
+  for(let i=0;i<Math.floor(14*h);i++){const x=mod(hash(i+40)*CW*1.5+dir*-t*(900+hash(i)*600),CW*1.5)-CW*.25,y=hash(i+60)*CH;ctx.beginPath();ctx.ellipse(x,y,6+hash(i)*10,1.6,0,0,7);ctx.fill();}
+  // vignette
+  const g=ctx.createRadialGradient(CW/2,CH/2,Math.min(CW,CH)*.3,CW/2,CH/2,Math.max(CW,CH)*.75);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,'+(.5*h)+')');ctx.fillStyle=g;ctx.fillRect(0,0,CW,CH);
+  ctx.restore();
+}
+window.__hur=HUR;
 
 function flames(x,y,w,h,k){
   const n=5;
@@ -3562,6 +3661,7 @@ function drawTargetMarker(){
   let id=tutTarget();
   if(!id&&S.carry)id=S.ck==='crate'?(S.fuel<2.5?'furnace':'coal'):'furnace';
   if(!id&&!S.ground&&S.hull<50&&!S.carry)id='bench';
+  if(!id&&!S.brkOn&&hurStr()>.12&&!S.ground)id='brake';
   if(!id&&!S.brkOn&&S.v>5&&!S.ground){const ns=nextStationAhead();if(ns!==null){const dd=ns-(S.d-TENDER_OFF);if(dd>-10&&dd<230)id='brake';}}
   if(!id)return;
   const t=TBY[id];if(!t)return;
@@ -3616,7 +3716,7 @@ function overlays(){
   }
   if(S.flash>0){ctx.fillStyle='rgba(255,80,40,'+(S.flash*.45)+')';ctx.fillRect(0,0,CW,CH);}
   if(S.warm<18){const k=(1-S.warm/18)*(.45+.2*Math.sin(S.t*5));ctx.fillStyle='rgba(8,20,40,'+(k*.6)+')';ctx.fillRect(0,0,CW,CH);}
-  try{bodyTempHUD();}catch(e){}
+  try{hurricaneOverlay();bodyTempHUD();}catch(e){}
 }
 function render(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
@@ -3635,7 +3735,7 @@ function render(){
   for(let i=0;i<STATIONS.length;i++)drawStation(i);
   drawGoal();drawTunnelBack();drawTrack();drawDrifts();drawBreaks();drawBlocks();drawDebris();drawSites();drawCreatures();drawWowBack();fogLayer(S.fog,false);
   ctx.save();ctx.translate(0,Math.sin(S.t*38)*S.bump*1.4);
-  ctx.save();trainScale();drawHeap();drawRearCars();ctx.save();ctx.translate(TL,0);beginPose(locoPose());ctx.translate(-TL,0);drawTrain();drawUpgrades();drawStoke();drawCabExtras();drawCabBrake();drawGauges();drawCargo();drawWheelHeat();drawDoorEtc();fireLight();ctx.restore();ctx.restore();if(!S.ground){beginPose(playerPoseP());drawPlayer();ctx.restore();}drawShell();ctx.restore();drawCrates();drawStopFronts();drawLadderMark();if(S.ground)drawGroundPlayer();drawWowFront();
+  ctx.save();trainScale();drawHeap();drawRearCars();ctx.save();ctx.translate(TL,0);beginPose(locoPose());ctx.translate(-TL,0);drawTrain();drawUpgrades();drawStoke();drawHurTrain();drawCabExtras();drawCabBrake();drawGauges();drawCargo();drawWheelHeat();drawDoorEtc();fireLight();ctx.restore();ctx.restore();if(!S.ground){beginPose(playerPoseP());drawPlayer();ctx.restore();}drawShell();ctx.restore();drawCrates();drawStopFronts();drawLadderMark();if(S.ground)drawGroundPlayer();drawWowFront();
   ctx.restore();
   drawTargetMarker();drawPromptTag();
   ctx.restore();
@@ -3675,7 +3775,7 @@ function fx(dt){
     for(let q=S.met.length-1;q>=0;q--){const m=S.met[q];m.x+=m.vx*dt;m.y+=m.vy*dt;m.life-=dt;if(m.life<=0)S.met.splice(q,1);}
   }
   S.shake=Math.max(0,S.shake-dt*1.6);S.flash=Math.max(0,S.flash-dt*1.5);S.bump*=Math.exp(-9*dt);
-  S.tilt+=(0-S.tilt)*(1-Math.exp(-2*dt));
+  S.tilt+=(hurTilt()-S.tilt)*(1-Math.exp(-2*dt));
 }
 function audioTick(){
   if(!AC)return;
