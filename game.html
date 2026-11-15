@@ -26,9 +26,9 @@ body{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px
 canvas{display:block;width:100%;height:100%}
 
 #sub{position:absolute;left:50%;bottom:4%;transform:translateX(-50%);width:max-content;max-width:92%;text-align:center;
-  font-size:14px;line-height:1.55;font-weight:600;padding:.55em 1em .55em 1em;border-radius:12px;
-  background:var(--ink);border:1px solid rgba(255,138,61,.4);color:var(--frost);
-  opacity:0;transition:opacity .25s;pointer-events:none;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+  font-size:14px;line-height:1.55;font-weight:600;padding:.3em 1em;
+  background:none;border:0;color:#f2f7fb;text-shadow:0 0 2px #000,0 1px 3px #000,0 0 10px rgba(0,0,0,.95),0 0 22px rgba(0,0,0,.8);
+  opacity:0;transition:opacity .25s;pointer-events:none}
 #sub.on{opacity:1}
 #sub::before{content:"";display:inline-block;width:.55em;height:.55em;margin-inline-start:.6em;border-radius:50%;background:var(--ember);box-shadow:0 0 .7em var(--ember);vertical-align:middle;animation:blink 1.6s infinite}
 @keyframes blink{50%{opacity:.35}}
@@ -163,7 +163,7 @@ const STORY_DEFS=[
  {id:'train',title:'قطارٌ سبقك',prop:{k:'cars',n:3,frozen:1},
   lines:['قطارٌ آخر وقف على السكة منذ الليلة الأولى. الركاب ما زالوا في مقاعدهم، والشاي في الأكواب متجمّد.','على المقعد الأخير دفتر مناوب. آخر سطر فيه: «الدفء يغادر من الأطراف أولاً. أبقِ قلبك قريباً من النار.»'],
   q:'ماذا تفعل؟',
-  a:{t:'خذ الفحم من عربتهم',res:{coal:10,text:'حملتَ الفحم بصمت. كأنك استأذنتَهم.'}},
+  a:{t:'خذ الفحم من عربتهم',res:{coal:7,text:'حملتَ الفحم بصمت. كأنك استأذنتَهم.'}},
   b:{t:'غطِّ الركاب بالبطانيات',res:{warm:45,text:'لم يتغيّر شيء، لكنك شعرتَ بدفءٍ غريب في صدرك.'}}},
  {id:'school',title:'ساحة المدرسة',prop:{k:'swings'},
   lines:['ساحة مدرسة. الأراجيح تتمايل مع الريح كأن أحداً لم يغادرها بعد.','على السبورة بالطباشير: «كم تبعد الشمس؟» وتحتها بخط طفل: «بعيدة. لكنها لم تذهب.»'],
@@ -195,7 +195,7 @@ const STORY_DEFS=[
   lines:['كوخ بجانب السكة، وفي نافذته ضوء! امرأة عجوز تلتفّ ببطانية وتبتسم.','قالت: «ظننتُ أنني آخر من تبقّى. اجلس، اشرب هذا.» ثم: «رأيتُ وهجاً في الشرق قبل أسبوع. بعيد، لكنه ثابت. لا تتوقف.»'],
   q:'تعرض عليك شيئاً.',
   a:{t:'اجلس واشرب الشاي',res:{warm:100,text:'كان أول شيء ساخن تلمسه منذ أيام. بكيتَ قليلاً دون أن تقول.'}},
-  b:{t:'احمل مؤونتها من الفحم',res:{coal:14,text:'رفضتْ أن تأخذ شيئاً مقابلها، وربّتت على كتفك.'}}},
+  b:{t:'احمل مؤونتها من الفحم',res:{coal:9,text:'رفضتْ أن تأخذ شيئاً مقابلها، وربّتت على كتفك.'}}},
  {id:'truck',title:'شاحنة المدافئ',prop:{k:'cars',n:1,truck:1},
   lines:['شاحنة شحن انقلبت. صناديقها مليئة بمدافئ صغيرة لم تُفتح.','كان أحدهم ينقل الدفء إلى المدينة… وصلت الشاحنة، ولم تصل المدينة.'],
   reward:{scrap:9,text:'فككتَ المدافئ وأخذتَ ما يمكن استخدامه.'}},
@@ -281,9 +281,9 @@ function genWorld(seed){
   d=6500;while(d<GOAL-5000){let y=Math.round(d);while(clash(y,300))y+=150;BLOCKS.push({x:y,k:Math.floor(R()*3)});busy.push(y);d=y+ur(24000,36000);}
   { // firewood: cut logs stacked beside stations, near fallen poles, and in dead groves
     const addLogs=(x,n)=>{let y=Math.round(x);while(clash(y,160))y+=90;if(!CRATES.some(c=>Math.abs(c.x-y)<260))CRATES.push({x:y,n:n});};
-    for(const s of STATIONS)addLogs(s-480,3+Math.floor(R()*2));
-    for(const b of BLOCKS)addLogs(b.x+260,3+Math.floor(R()*2));
-    d=900;while(d<GOAL-700){addLogs(d,3+Math.floor(R()*3));d+=ur(800,1500);}
+    for(const s of STATIONS)addLogs(s-480,2+Math.floor(R()*2));
+    for(const b of BLOCKS)addLogs(b.x+260,2+Math.floor(R()*2));
+    d=900;while(d<GOAL-700){addLogs(d,2+Math.floor(R()*2));d+=ur(1900,3200);}
     CRATES.sort((a,b)=>a.x-b.x);
   }
   { const WK=['aurora','bridge','tunnel','arch'];let wi=0;d=5200;
@@ -402,7 +402,7 @@ function newState(skip,seed){
   return {
     t:0,playT:0,d:0,v:0,a:0,aS:0,thr:0,brake:0,brakeAng:0,brkOn:false,brkAnim:0,brkLv:0,wheelHeat:0,
     fuel:skip?3:0,Tf:skip?.5:0,P:skip?62:14,W:skip?88:72,
-    warm:100,hull:100,coalPile:skip?18:14,carry:false,throws:0,scrap:skip?4:0,
+    warm:100,hull:100,coalPile:skip?13:10,carry:false,throws:0,scrap:skip?4:0,
     px:430,pv:0,face:1,walk:0,work:null,repair:0,load:0,loot:0,
     fixed:{},cleared:{},looted:{},said:{},told:{},done:{},flags:{},upg:{},
     mem:null,crit:{},aur:0,tun:0,
@@ -703,7 +703,7 @@ function update(dt){
     if(S.repair>=4){S.cleared[near.b.x]=true;S.repair=0;tone(420,.3,.1);tone(630,.3,.06);burst(500,.5,.25,.9);say('أُزيل العائق.',2600);}
   }else S.repair=Math.max(0,S.repair-dt*1.5);
   if(work==='load'){S.load+=dt;S.digA=(S.digA||0)+dt;
-    if(S.load>=.7){S.load=0;S.shovelT=.6;S.digN=(S.digN||0)+1;S.loadN[st]=(S.loadN[st]||0)+1;S.coalPile=Math.min(pileCap(),S.coalPile+5);
+    if(S.load>=.7){S.load=0;S.shovelT=.6;S.digN=(S.digN||0)+1;S.loadN[st]=(S.loadN[st]||0)+1;S.coalPile=Math.min(pileCap(),S.coalPile+3.5);
       for(let i=0;i<7;i++)S.chunks.push({x:TL+342+rnd(-4,4),y:FLOOR-34,vx:rnd(-70,-20),vy:rnd(-150,-90),a:1,s:rnd(1.4,2.8)});
       tone(170,.12,.09,'triangle');burst(500,.15,.1,1.4);loadFx();
       if(S.loadN[st]>=6){const si=stationIndex(st);S.scrap+=3+((si*5)%4);S.looted[st]=true;tone(440,.25,.09);say('اكتمل التحميل، وجمعتَ بعض القطع.',3200);saveGame();}}
@@ -744,7 +744,7 @@ function update(dt){
   const draft=clamp(.35+.035*av+.5*ta,.35,1.3);
   const tgt=clamp(S.fuel/3.5,0,1)*Math.min(1,.55+.5*draft);
   S.Tf+=(tgt-S.Tf)*(1-Math.exp(-dt/2.5));
-  S.fuel=Math.max(0,S.fuel-(.008+.056*S.Tf*draft)*dt*(1+.1*L('heat'))*DF().burn*[1,.92,.85][L('boiler')]);
+  S.fuel=Math.max(0,S.fuel-(.008+.056*S.Tf*draft)*dt*(1+.1*L('heat'))*DF().burn*.86*[1,.92,.85][L('boiler')]);
   if(L('stoker')>0){
     S.stokerT-=dt;const th=L('stoker')>1?2.4:1.3;
     if(S.stokerT<=0&&S.fuel<th&&S.coalPile>0){S.coalPile--;S.fuel=Math.min(12,S.fuel+1);S.throws++;S.doorOpen=.55;S.smoke=1.6;S.stokerT=L('stoker')>1?3:6;burst(900,.2,.1,1.5);tone(120,.12,.06);}
@@ -814,7 +814,7 @@ function update(dt){
       }
     }
   }
-  for(const f of S.fly){f.t+=dt/.9;if(!f.done&&f.t>=1){f.done=1;S.coalPile=Math.min(pileCap(),S.coalPile+7);tone(110,.15,.08);burst(420,.3,.18,2.2);for(let q=0;q<14;q++)S.chunks.push({x:TL+250+rnd(-14,14),y:FLOOR-96,vx:rnd(-25,25),vy:rnd(-40,10),a:1,s:rnd(1.6,3.2),k:1,age:0});}}
+  for(const f of S.fly){f.t+=dt/.9;if(!f.done&&f.t>=1){f.done=1;S.coalPile=Math.min(pileCap(),S.coalPile+5);tone(110,.15,.08);burst(420,.3,.18,2.2);for(let q=0;q<14;q++)S.chunks.push({x:TL+250+rnd(-14,14),y:FLOOR-96,vx:rnd(-25,25),vy:rnd(-40,10),a:1,s:rnd(1.6,3.2),k:1,age:0});}}
   S.fly=S.fly.filter(f=>f.t<1.05);
   { const acc=(S.v-(S._pv||0))/Math.max(dt,.001);S._pv=S.v;S.inr=S.inr||0;S.iv=S.iv||0;S.iv+=(-26*S.inr-4.2*S.iv-acc*.75+(S.slopeAng||0)*16+(Math.random()-.5)*(S.v>3?S.v*.02:0))*dt;S.inr=clamp(S.inr+S.iv*dt,-1.6,1.6); }
   for(const c of S.cargo){c.vx=(c.vx||0)+(S.inr||0)*18*dt;c.vx*=Math.exp(-3.2*dt);c.x=clamp(c.x+c.vx*dt,5,590);}
@@ -1203,7 +1203,7 @@ function drawPlain(){
   for(let i=0;i<28;i++){
     const y=338+hash(i*3.1)*56,f=(y-332)/56,par=.1+.5*f,L=1920;
     const x=mod(hash(i)*L-S.d*PX*par,L)-200+XMIN,len=18+60*f;
-    ctx.strokeStyle='rgba(225,242,250,'+(.08+.12*f)+')';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+len*.5,y+2*f);ctx.lineTo(x+len,y-f);ctx.stroke();
+    ctx.strokeStyle='rgba(225,242,250,'+(.02+.035*f)+')';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+len*.5,y+2*f);ctx.lineTo(x+len,y-f);ctx.stroke();
   }
 }
 function drawPoles(){
@@ -3523,7 +3523,7 @@ drawProp=function(p,x,fresh){
   {id:'tank',title:'الدبابة الصامتة',prop:{k:'tank'},
    lines:['دبابة توقفت وسط الطريق. الجنود تركوا الأبواب مفتوحة وذهبوا.','على الرشاش علّقوا قبعتين، وتحتهما ورقة: «لم نجد أحداً نقاتله».'],
    q:'في خزانها وقود، وفي مقصورتها جهاز لاسلكي قديم.',
-   a:{t:'اسحب الوقود',res:{coal:12,flag:'greed',text:'امتلأت عربة الفحم. وشعرتَ أنك أخذتَ شيئاً أكثر من الوقود.'}},
+   a:{t:'اسحب الوقود',res:{coal:8,flag:'greed',text:'امتلأت عربة الفحم. وشعرتَ أنك أخذتَ شيئاً أكثر من الوقود.'}},
    b:{t:'خذ اللاسلكي فقط',res:{scrap:5,flag:'signal',text:'لم تنقذ اللاسلكي كله، لكنه التقط خيطاً ضعيفاً: «محطة الفجر… محطة الفجر…»'}}},
   {id:'carousel',title:'دوّارة الخيل',prop:{k:'carousel'},
    lines:['دوّارة ملاهٍ والخيول الخشبية متجمدة وهي تركض.','في مركزها صندوق موسيقى صغير بمفتاح.'],
@@ -3572,7 +3572,7 @@ drawProp=function(p,x,fresh){
    b:{t:'خذ بطارياتهم الشمسية',res:{scrap:10,flag:'greed',text:'الطاقة تكفي القطار لأيام. والبذور تنتظر من غيرك.'}}},
   {id:'forest',title:'الغابة الصامتة',prop:{k:'tree'},
    lines:['غابة أشجارها بيضاء كالعظام. لا ريح. لا صوت.','بين الجذوع أكوام حطب مرتبة، كأن أحداً جهّزها لك.'],
-   reward:{coal:10,warm:10,text:'جمعتَ الحطب. أحسستَ أن الغابة تراقبك بلطف.'}},
+   reward:{coal:6,warm:10,text:'جمعتَ الحطب. أحسستَ أن الغابة تراقبك بلطف.'}},
   {id:'violin',title:'عازف الكمان',prop:{k:'violin'},
    lines:['على رصيف محطة قديمة رجل جالس يعزف. تجمّد قبل أن ينهي القوس.','أمامه علبة كمان مفتوحة، وفيها أوراق نقدية صارت جليداً.'],
    q:'الكمان ما زال سليماً.',
@@ -3670,14 +3670,15 @@ function evTick(dt){
   if(EV.cd<0)EV.cd=rnd(70,140);
   EV.cd-=dt;if(EV.cd>0)return;EV.cd=rnd(90,190);
   const pool=['wolves','supply','pipes','lightning','aurora','steam','frost','signal'].filter(k=>k!==EV.last);
-  const k=pool[Math.floor(Math.random()*pool.length)];EV.last=k;
+  const k=EV.force||pool[Math.floor(Math.random()*pool.length)];EV.force=null;EV.last=k;
+  try{evSpawn(k);}catch(e){}
   switch(k){
     case 'wolves':EV.wolf=11;say('ذئاب! قطيع يركض بجانب القطار. زد السرعة قبل أن يقفزوا على العربة.',5200);burst(300,.5,.08,2);tone(180,.6,.05,'sawtooth',120);break;
-    case 'supply':S.coalPile=Math.min(30,S.coalPile+6);S.scrap=(S.scrap||0)+2;say('صندوق إمدادات ملقى بجانب السكة. تعلّق به أحدهم بمظلة قبل سنوات. أخذتَ فحماً وبعض الحديد.',5800);tone(520,.25,.08);break;
+    case 'supply':S.coalPile=Math.min(30,S.coalPile+4);S.scrap=(S.scrap||0)+2;say('صندوق إمدادات ملقى بجانب السكة. تعلّق به أحدهم بمظلة قبل سنوات. أخذتَ فحماً وبعض الحديد.',5800);tone(520,.25,.08);break;
     case 'pipes':S.hull=Math.max(0,S.hull-3);S.Tf*=.85;say('تجمّدت الأنابيب فجأة وسمعتَ طقطقة. الفرن يضعف قليلاً.',4600);burst(1400,.3,.08,3);break;
     case 'lightning':EV.flash=1;burst(90,1.2,.22,.6);tone(60,.9,.12,'sawtooth',30);if(S.storm>.3){S.hull=Math.max(0,S.hull-4);say('صاعقة ضربت الجليد قرب القطار! اهتزّ الهيكل.',4200);}else say('ومض في السماء السوداء، ثم رعدٌ بعيد. عاصفة في مكانٍ ما.',4200);break;
     case 'aurora':EV.aur=28;S.warm=Math.min(100,S.warm+8);say('شفق أخضر يرقص في السماء. نسيتَ البرد للحظة.',5200);break;
-    case 'steam':S.Tf*=.9;S.fuel=Math.max(0,S.fuel-.8);say('تسرّب بخار من وصلة قديمة. خسرتَ بعض الحرارة.',4400);burst(2600,.8,.07,.8);break;
+    case 'steam':try{evSteamPuff();}catch(e){}S.Tf*=.9;S.fuel=Math.max(0,S.fuel-.8);say('تسرّب بخار من وصلة قديمة. خسرتَ بعض الحرارة.',4400);burst(2600,.8,.07,.8);break;
     case 'frost':EV.frost=22;say('الصقيع يغطّي النوافذ. بالكاد ترى الطريق.',4400);break;
     case 'signal':S.flags=S.flags||{};S.flags.signal=1;say('على الراديو: «…الفجر…ننتظركم… اتجهوا شرقاً…» ثم صمت.',6000);tone(900,.2,.05);tone(700,.2,.05);break;
   }
@@ -3787,6 +3788,7 @@ function trainShadow(){
   ctx.restore();
 }
 function drawNearDepth(){
+  try{evWorld(_frameDt);}catch(e){}
   const sp=S.v*PX,par=1.75,L=1500,sc=S.d*PX*par;
   ctx.save();ctx.shadowColor='rgba(2,6,12,.9)';ctx.shadowBlur=7;
   const i0=Math.floor(sc/L)-1;
@@ -3821,6 +3823,58 @@ function gradePass(){
   const g=ctx.createLinearGradient(0,0,0,CH);g.addColorStop(0,'rgba(30,70,130,.14)');g.addColorStop(.55,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(40,20,10,.16)');
   ctx.globalCompositeOperation='soft-light';ctx.fillStyle=g;ctx.fillRect(0,0,CW,CH);ctx.restore();
 }
+
+// ---------- two-finger pinch zoom (replaces the +/- buttons) ----------
+(function(){
+  const st=document.createElement('style');st.textContent='#zoomB{display:none!important}';document.head.appendChild(st);
+  let pd=0;
+  const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+  addEventListener('touchstart',e=>{if(e.touches.length===2)pd=dist(e.touches);},{passive:true});
+  addEventListener('touchmove',e=>{if(e.touches.length===2&&pd>0){const d=dist(e.touches);if(d>0){zoomBy(clamp(d/pd,.9,1.1));pd=d;}e.preventDefault();}},{passive:false});
+  addEventListener('touchend',e=>{if(e.touches.length<2)pd=0;},{passive:true});
+})();
+// ---------- 3D-ish event actors ----------
+const EA={wolves:[],bolt:null,crate:null};
+function evSpawn(k){
+  if(k==='wolves'){EA.wolves=[];for(let i=0;i<5;i++)EA.wolves.push({x:TL+780+i*70+rnd(0,40),lane:rnd(.05,1),ph:rnd(0,6)});}
+  if(k==='lightning'){const x0=rnd(120,800);const pts=[[x0,-30]];let x=x0,y=-30;while(y<GY-30){x+=rnd(-26,26);y+=rnd(22,44);pts.push([x,y]);}EA.bolt={pts,t:0};}
+  if(k==='supply'){EA.crate={x:rnd(520,760),y:-40,t:0,land:false,lt:0};}
+}
+function wolfDraw(x,y,s,ph,run){
+  ctx.save();ctx.translate(x,y);ctx.scale(-s,s);ctx.fillStyle='#03070c';
+  const b=Math.sin(ph)*2;
+  ctx.beginPath();ctx.ellipse(0,-22+b*.5,24,10,0,0,7);ctx.fill();
+  ctx.beginPath();ctx.ellipse(24,-30+b*.5,9,6.5,-.35,0,7);ctx.fill();ctx.beginPath();ctx.moveTo(30,-34);ctx.lineTo(41,-29);ctx.lineTo(30,-28);ctx.fill();
+  ctx.beginPath();ctx.moveTo(22,-36);ctx.lineTo(24,-44);ctx.lineTo(28,-35);ctx.fill();
+  ctx.lineWidth=3.2;ctx.strokeStyle='#03070c';ctx.lineCap='round';
+  for(let k=0;k<4;k++){const a=ph+k*1.57+(k>1?3.14:0),fx=(k<2?16:-18)+Math.sin(a)*(run?11:2);ctx.beginPath();ctx.moveTo(k<2?14:-16,-16);ctx.lineTo(fx,-1);ctx.stroke();}
+  ctx.beginPath();ctx.moveTo(-23,-24);ctx.quadraticCurveTo(-38,-22+b,-44,-14);ctx.stroke();
+  ctx.fillStyle='rgba(255,210,110,.95)';ctx.beginPath();ctx.arc(30,-31,1.5,0,7);ctx.fill();
+  ctx.restore();
+}
+function evWorld(dt){
+  if(EA.wolves.length){
+    ctx.save();
+    for(const w of EA.wolves.slice().sort((a,b)=>a.lane-b.lane)){
+      const run=EV.wolf>0,y=GY+14+w.lane*74,s=.55+w.lane*.75;
+      if(run){w.ph+=dt*(10+S.v*.3);w.x+=(S.v>14?-60:(-25+S.v*2.5))*dt*(.6+w.lane);}else{w.ph+=dt*6;w.x+=150*dt;}
+      ctx.globalAlpha=.55+.45*w.lane;wolfDraw(w.x,y,s,w.ph,run);
+    }
+    ctx.restore();EA.wolves=EA.wolves.filter(w=>w.x>-140&&w.x<1200);
+  }
+  if(EA.bolt){const b=EA.bolt;b.t+=dt;const a=Math.max(0,1-b.t*2.4);
+    if(a<=0)EA.bolt=null;else{ctx.save();ctx.globalCompositeOperation='lighter';ctx.strokeStyle='rgba(215,235,255,'+a+')';ctx.lineWidth=3;ctx.shadowColor='rgba(170,210,255,1)';ctx.shadowBlur=18;
+      ctx.beginPath();b.pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();ctx.lineWidth=1.2;ctx.strokeStyle='rgba(255,255,255,'+a+')';ctx.stroke();ctx.restore();}}
+  if(EA.crate){const c=EA.crate;c.t+=dt;c.x-=S.v*PX*dt;
+    if(!c.land){c.y+=(34+10*Math.sin(c.t*1.4))*dt*2.2;c.x+=Math.sin(c.t*1.4)*22*dt;if(c.y>=GY-14){c.y=GY-14;c.land=true;c.lt=0;}}else c.lt+=dt;
+    if(c.lt>6||c.x<-80)EA.crate=null;else{
+      ctx.save();ctx.globalAlpha=c.land?Math.max(0,1-c.lt/6):1;
+      if(!c.land){ctx.fillStyle='#b9c6d0';ctx.beginPath();ctx.moveTo(c.x-34,c.y-70);ctx.quadraticCurveTo(c.x,c.y-112,c.x+34,c.y-70);ctx.quadraticCurveTo(c.x,c.y-80,c.x-34,c.y-70);ctx.fill();
+        ctx.strokeStyle='rgba(200,215,225,.8)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(c.x-34,c.y-70);ctx.lineTo(c.x-8,c.y-8);ctx.moveTo(c.x+34,c.y-70);ctx.lineTo(c.x+8,c.y-8);ctx.moveTo(c.x,c.y-82);ctx.lineTo(c.x,c.y-8);ctx.stroke();}
+      ctx.fillStyle='#6a4a25';ctx.fillRect(c.x-11,c.y-10,22,16);ctx.strokeStyle='#2c1c0c';ctx.lineWidth=1.4;ctx.strokeRect(c.x-11,c.y-10,22,16);ctx.beginPath();ctx.moveTo(c.x-11,c.y-2);ctx.lineTo(c.x+11,c.y-2);ctx.stroke();
+      ctx.restore();}}
+}
+function evSteamPuff(){for(let i=0;i<8;i++)S.steam.push({x:TL+rnd(470,520),y:FLOOR-70+rnd(-10,10),vx:rnd(-20,20),vy:-rnd(40,90),r:4,a:.5,dark:0});}
 
 function flames(x,y,w,h,k){
   const n=5;
@@ -4214,10 +4268,6 @@ function drawFx(){
 }
 function drawFg(){
   const sp=S.v*PX;
-  if(sp>8){
-    ctx.strokeStyle='rgba(225,242,250,.09)';ctx.lineWidth=1.5;
-    for(let i=0;i<18;i++){const L=VW*1.6,y=GY+44+hash(i*2.3)*90,x=mod(hash(i)*L-S.d*PX*1.3,L)-100+XMIN,len=14+sp*.25;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+len,y);ctx.stroke();}
-  }
   ctx.fillStyle='#050b16';ctx.beginPath();ctx.moveTo(XMIN-20,640);
   for(let x=XMIN-20;x<=VW+20;x+=12){const wx=x+S.d*PX*1.25;ctx.lineTo(x,GY+108+Math.sin(wx*.012)*9+Math.sin(wx*.031)*5);}
   ctx.lineTo(VW+20,640);ctx.closePath();ctx.fill();
