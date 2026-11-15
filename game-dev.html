@@ -3992,12 +3992,12 @@ function updSmoke(dt){
   let chuff=false;
   if(Math.abs(v)>.6){if(beat!==S._beat){chuff=true;S._beat=beat;}}else if(S._idleT>1.3){chuff=true;S._idleT=0;}
   const hot=.3+Math.min(.7,S.Tf*.8);
-  if(chuff&&arr.length<260){
-    const n=Math.abs(v)>.6?3:2;
-    for(let k=0;k<n;k++)arr.push({x:TL+650+rnd(-3,3),y:FLOOR-152-k*3,vx:0,vy:0,u:vs*.9+rnd(-6,6),w:-(95+rnd(0,55))*(.6+hot*.6),T:1,r:3.6+rnd(0,2.5),a:.4+.5*hot,dark:(S.Tf>.1||S.smoke>0)?1:0,s:S.smoke>0?1.4:1,k:Math.floor(Math.random()*2),age:0,sd:Math.random()*20});
+  if(chuff&&arr.length<460){
+    const sp2=clamp(Math.abs(v)/45,0,1),n=(Math.abs(v)>.6?3:2)+Math.round(sp2*6);
+    for(let k=0;k<n;k++)arr.push({x:TL+650+rnd(-3,3),y:FLOOR-152-k*3,vx:0,vy:0,u:vs*.9+rnd(-6,6),w:-(95+rnd(0,55))*(.6+hot*.6),T:1,r:3.6+rnd(0,2.5)+sp2*3,a:Math.min(1,.4+.5*hot+.25*sp2),dark:(S.Tf>.1||S.smoke>0)?1:0,s:S.smoke>0?1.4:1,k:Math.floor(Math.random()*2),age:0,sd:Math.random()*20});
   }
-  S.smokeAcc=(S.smokeAcc||0)+dt*(.8+S.Tf*3.2+(S.smoke>0?9:0)+(S.flare||0)*6);
-  while(S.smokeAcc>=1){S.smokeAcc--;if(arr.length>260)break;
+  S.smokeAcc=(S.smokeAcc||0)+dt*(.8+S.Tf*3.2+clamp(Math.abs(v)/45,0,1)*16*Math.max(.4,S.Tf)+(S.smoke>0?9:0)+(S.flare||0)*6);
+  while(S.smokeAcc>=1){S.smokeAcc--;if(arr.length>460)break;
     arr.push({x:TL+650+rnd(-3,3),y:FLOOR-152,vx:0,vy:0,u:vs*.9,w:-60-rnd(0,30),T:.9,r:2.6+rnd(0,2),a:.25+Math.min(.4,S.Tf*.5),dark:(S.Tf>.1||S.smoke>0)?1:0,s:S.smoke>0?1.4:1,k:Math.floor(Math.random()*2),age:0,sd:Math.random()*20});}
 }
 function drawSmoke(){
