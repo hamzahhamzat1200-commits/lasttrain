@@ -1166,6 +1166,7 @@ function drawSky(){
   for(const s of stars){ctx.fillStyle='rgba(235,245,255,'+(.3+.45*Math.sin(S.t*.9+s.p))+')';ctx.fillRect(s.x,s.y,s.r,s.r);}
   glow(240,292,210,'255,160,100',.3);
   ctx.fillStyle='rgba(255,224,192,.9)';circ(240,296,26);ctx.fill();
+  drawDawnSun();
   ctx.save();ctx.globalCompositeOperation='lighter';
   const cols=bioAur(),ambA=bio().amb;
   for(let k=0;k<3;k++){
@@ -4411,7 +4412,8 @@ function bio(){
   return _bio;
 }
 const _rgb=c=>'rgb('+(c[0]|0)+','+(c[1]|0)+','+(c[2]|0)+')';
-function bioSkyStops(){const b=bio(),p=[0,.4,.75,1];return b.sky.map((c,i)=>[p[i],_rgb(c)]);}
+const DAWN_SKY=[[38,22,44],[104,56,70],[222,138,98],[255,214,168]];
+function bioSkyStops(){const b=bio(),p=[0,.4,.75,1],k=(typeof dawnK==='function')?dawnK():0;return b.sky.map((c,i)=>[p[i],_rgb(k?[c[0]+(DAWN_SKY[i][0]-c[0])*k,c[1]+(DAWN_SKY[i][1]-c[1])*k,c[2]+(DAWN_SKY[i][2]-c[2])*k]:c)]);}
 function bioAur(){return bio().aur.map(c=>(c[0]|0)+','+(c[1]|0)+','+(c[2]|0));}
 function bioMtn(col){
   const m=/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(col);if(!m)return col;
@@ -4444,6 +4446,153 @@ function drawBioScenery(){
     const g=ctx.createLinearGradient(0,344,0,362);g.addColorStop(0,'rgba(170,205,235,0)');g.addColorStop(.5,'rgba(170,205,235,'+(.12*Math.min(1,ice))+')');g.addColorStop(1,'rgba(170,205,235,0)');
     ctx.fillStyle=g;ctx.fillRect(XMIN-8,344,VW-XMIN+16,18);
   }
+}
+
+/* ---------- realistic wheel / rail sound ---------- */
+// axle positions (metres behind the loco's leading axle) of the whole consist
+const AXLES=[0,1.9,3.8,6.4,8.2,12.4,14.2,18.6,20.4,24.8,26.6];
+function railHit(ac,dest,t,gain,pitch,hard){
+  // 1) sharp steel-on-steel transient
+  const len=Math.floor(ac.sampleRate*.05),buf=ac.createBuffer(1,len,ac.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(len*.16));
+  const n=ac.createBufferSource();n.buffer=buf;
+  const hp=ac.createBiquadFilter();hp.type='highpass';hp.frequency.value=1400*pitch;
+  const ng=ac.createGain();ng.gain.value=gain*(.55+.45*hard);
+  n.connect(hp);hp.connect(ng);ng.connect(dest);n.start(t);
+  // 2) rail ringing: a few damped resonances
+  for(const [f,dec,a] of [[560,.13,.32],[1380,.08,.2],[2750,.05,.1]]){
+    const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=f*pitch*(1+(Math.random()-.5)*.03);
+    g.gain.setValueAtTime(gain*a*hard,t);g.gain.exponentialRampToValueAtTime(.0004,t+dec);
+    o.connect(g);g.connect(dest);o.start(t);o.stop(t+dec+.02);
+  }
+  // 3) dull thump of wheel dropping into the gap / the sleepers
+  const th=ac.createOscillator(),tg=ac.createGain();th.type='sine';th.frequency.setValueAtTime(95*pitch,t);th.frequency.exponentialRampToValueAtTime(48,t+.09);
+  tg.gain.setValueAtTime(gain*1.1*hard,t);tg.gain.exponentialRampToValueAtTime(.0004,t+.11);th.connect(tg);tg.connect(dest);th.start(t);th.stop(t+.13);
+}
+function clackSynth(ac,dest,t0,v,vol){
+  const sp=Math.max(v,2.5);
+  AXLES.forEach((m,i)=>{
+    const t=t0+m/sp+(Math.random()-.5)*.004;
+    const lead=(i===0||i===3||i===5||i===7||i===9)?1:.72;          // first axle of each bogie hits harder
+    railHit(ac,dest,t,vol*lead,.92+Math.random()*.16,.7+.3*Math.random());
+  });
+}
+function clackSound(v){
+  if(!AC||muted)return;
+  clackSynth(AC,master,AC.currentTime,v,Math.min(1,.22+v/26)*.05);
+}
+window.__clackSynth=(ac,dest,t0,v,vol)=>clackSynth(ac,dest,t0,v,vol);
+
+/* ---------- copyright splash shown the moment the game starts ---------- */
+(function(){
+  const st=document.createElement('style');
+  st.textContent='#cr{position:fixed;inset:0;z-index:100000;background:#04070d;display:flex;align-items:center;justify-content:center;direction:rtl;text-align:center;color:#cfdbe6;font-family:system-ui,sans-serif;transition:opacity 1.1s;opacity:1}'+
+  '#cr.out{opacity:0;pointer-events:none}#cr .in{max-width:min(560px,86vw);line-height:1.9}#cr h1{margin:0 0 10px;font-size:26px;letter-spacing:1px;color:#ffd9a0;font-weight:600}'+
+  '#cr p{margin:6px 0;font-size:13px;opacity:.82}#cr small{display:block;margin-top:14px;font-size:10.5px;opacity:.55;line-height:1.7}';
+  document.head.appendChild(st);
+  const d=document.createElement('div');d.id='cr';
+  d.innerHTML='<div class="in"><h1>آخر قطار</h1><p>© 2026 Hamzawe1200 — جميع الحقوق محفوظة</p>'+
+   '<p>لعبة مستقلة. القصة والرسوم والبرمجة من تطوير Hamzawe1200.</p>'+
+   '<small>الأصوات من freesound.org: unfa · kingsrow · blaukreuz · funwithsound · qvantor — حقوقها لأصحابها حسب تراخيصها.<br>المجسّمات من Poly Haven بترخيص CC0.<br>باقي الموسيقى والمؤثرات مُولَّدة داخل اللعبة.</small></div>';
+  document.body.appendChild(d);
+  let gone=false;const out=()=>{if(gone)return;gone=true;d.classList.add('out');setTimeout(()=>d.remove(),1300);};
+  d.addEventListener('click',out);d.addEventListener('touchstart',out,{passive:true});
+  setTimeout(out,4800);
+})();
+
+/* ---------- the ending: a long, cathartic finale with a dawn that rises behind the text ---------- */
+let outroOn=false;
+function startOutro(){
+  outroOn=true;
+  const f=S.flags||{},H=hopeScore(),greed=!!f.greed;
+  const best=H>=7&&!greed,mid=!best&&H>=3;
+  const who=(f.layla||best)?'ليلى':'امرأةٌ بمعطف المهندسين';
+  const O=OUTRO;O.length=0;
+  S.ending=best?'dawn':(mid?'embers':'ash');
+  // act I: the gate
+  O.push('عبرتُ بوابة الوادي والضباب بلون العسل يلتفّ حول المدخنة. للمرة الأولى منذ أيامٍ لا أسمع صرير الجليد تحت العجلات.',
+         'ثم رأيتُه: ضوءٌ ثابت لا يرتجف. ليس مصباح حطام، ولا انعكاس ثلج. نورٌ يعمل.');
+  // act II: the heart
+  O.push('في أسفل الوادي محطة حرارية قديمة، مداخنها باردة منذ الليلة الأولى. حولها ناجون يتحلّقون حول مصباحٍ واحد، ينتظرون ما لا يعرفون اسمه.');
+  if(best||mid)O.push('قالت '+who+' بصوتٍ خرج من تحت التعب: «المرجل الكبير، القلب، لا يشتعل من العدم. يحتاج جمرةً حيّة جاءت من نارٍ لم تنطفئ قط».');
+  else O.push('قال لي رجلٌ عجوز ولم يرفع عينيه عن الأرض: «القلب لا يشتعل من العدم. يحتاج جمرةً من نارٍ لم تنطفئ قط. جئتَ متأخراً… لكن ربما جئتَ في الوقت».');
+  O.push('نظرتُ إلى فرن القطار. الجمرة نفسها التي أبقيتُها ليلةً بعد ليلة، حين كان كل شيءٍ يطلب مني أن أنام وأستسلم.');
+  if(greed){
+    O.push('وتذكّرتُ الفحم الذي كدّسته لنفسي على الطريق. كان يكفي ليُشعل القلب مئة مرة. لو تركتُ منه لغيري لوصل معي أكثر ممن ينتظرني الآن. حملتُ هذه الفكرة معي إلى باب المرجل، ولم أستطع تركها هناك.');
+  }
+  O.push('حملتُ الجمرة بالمجرفة إلى فانوس صغير، ومشيتُ بها بين الناس. كلهم صامتون، كمن يمشي خلف نعش… أو خلف ولادة.',
+         'فتحتُ باب القلب ووضعتُ الجمرة بين الفحم. لحظةٌ من لا شيء. ثم صوتٌ منخفض… ثم هدير.');
+  // act III: the dawn
+  O.push('اهتزّت الأنابيب. سرى الدفء في الجدران، في الزجاج، في أصابعي التي نسيتُ أنها تُحَسّ. وانهمر الجليد عن النوافذ كأن الشتاء نفسه يتنهّد.');
+  if(best){
+    O.push('خرجنا جميعاً. وفي الأفق، خلف غبار الجليد الذي حجب الشمس أياماً لا تُحصى، انشقّ الغيم عن خيطٍ رفيع من ذهب.',
+           'الشمس. لم أرها منذ الليلة الأولى. وقفتُ أمامها كما يقف المرء أمام من أخطأ بحقّه ثم عاد.',
+           'وتذكّرتُ تلسكوب المرصد الذي ظلّ موجّهاً إلى هذه النقطة بالذات. كأن أحداً مات وهو واثقٌ بأننا سنصل.');
+  }else if(mid){
+    O.push('خرجنا جميعاً. وفي الأفق انشقّ الغبار شقّاً ضيقاً، ومرّ منه خيطٌ باهت من ضوء. لم تكن شمساً كاملة. لكنها كانت أول ضوءٍ لا يأتي من نار.');
+  }else{
+    O.push('خرجنا. الغبار لم ينقشع، لكنه رقّ. ومن خلفه، كأنه يختبرنا، لمع قرصٌ باهت. أول مرة منذ زمن أتذكّر أن للسماء لوناً غير الرماد.');
+  }
+  // act IV: the reckoning with the cold (the catharsis)
+  O.push('قبل أن يدفئني الفرح جاء الغضب. كل ما أخذه البرد دفعةً واحدة: الركاب في مقاعدهم، الأسرة المتعانقة في السيارة، أراجيح المدرسة تتأرجح وليس عليها أحد.');
+  if(best||mid)O.push('صرختُ. لأول مرة. في وجه الشتاء والغبار والصمت، حتى بحّ صوتي. لم يردّ أحد، لكن لم يمنعني أحد أيضاً. ثم بكيتُ، ولم تتجمّد دموعي على وجهي.');
+  else O.push('صرختُ في وجه الشتاء حتى بحّ صوتي. لم يردّ. لكن في المرة الأولى منذ الليلة الأولى لم يكن الصمت أقوى مني.');
+  O.push('ثم رنّ جرس القطار وحده، ردّت المحطة بصافرة طويلة، ثم صافرة ثانية من بعيد، ثم نداءاتٌ من ناجين لم أكن أعلم بوجودهم. العالم كان يجيب.');
+  if(best||mid)O.push('دفنّا الأسماء. كل اسمٍ قرأتُه على دفتر مناوب، وكل صورةٍ وجدتُها في سيارة، وُضعت تحت أول غرسةٍ زرعناها في التراب الذي ذاب. لم يعد أحدٌ منهم مجهولاً.');
+  if(best||mid){
+    if(f.seeds)O.push('فتحتُ علبة البذور. أول حفنة وُضعت في الدفيئة، ونبتت قبل المساء.');
+    if(f.letters)O.push('وزّعتُ الرسائل. بعضها وجد أصحابه، وبعضها قُرئ بصوتٍ عالٍ لمن لا اسم له.');
+    if(f.violin||f.music)O.push('عزفتُ لهم لحناً على الكمان القديم. رقص الأطفال حول النار، وبكت امرأةٌ وضحكت في آنٍ واحد.');
+    if(f.cat||f.fox||f.plant)O.push('القطار صار بيتاً. فيه نبتة تنمو، وصديقٌ صغير يخرخر عند الفرن.');
+  }
+  try{const ex=extOutroLines();for(const l of ex)O.push(l);}catch(e){}
+  if(best){
+    O.push('جلستُ على الرصيف أنظر إلى القطار الذي حملني. بدا أصغر مما أذكر، وأجمل. ربّتُّ على جانبه كما يُربَّت على كتف صديقٍ عاد معك من الحرب.',
+           'لم نكن آخر قطار. كنّا أول فجر.');
+  }else if(mid){
+    O.push('لم يكن الفجر كاملاً. لكنه كان يكفي لتدفئة بيتٍ واحد، وسيأتي بعده غيره. وأنا أعرف كيف تُبقى النار حيّة.',
+           'ما زلتُ أحتفظ بالمجرفة. العالم سيحتاج دوماً إلى من يعرف كيف يُبقي النار مشتعلة.');
+  }else{
+    O.push('جلستُ بجانب النار ولم أتكلم. وفي الليل سمعتُ في الأفق صافرة قطارٍ آخر. ربما هو الصدى… وربما غيري أيضاً لم ينتهِ بعد.');
+  }
+  S.dawn=0;S.dawnT=0;outI=0;renderOutro();
+}
+(function(){const st=document.createElement('style');st.textContent='#ov.outro{background:linear-gradient(180deg,rgba(3,6,12,0) 30%,rgba(3,6,12,.78) 100%)!important;align-items:flex-end!important;padding-bottom:18px}#ov.outro .pn.intro .tx{text-shadow:0 2px 10px rgba(0,0,0,.9)}';document.head.appendChild(st);})();
+function renderOutro(){
+  if(outI>=OUTRO.length){
+    hideOv();ovEl.classList.remove('outro');S.dawnT=1;S.dawn=Math.max(S.dawn||0,.95);
+    const km=Math.round(GOAL/1000),mins=Math.round((S.playT||0)/60),n=S.surv?S.surv.length:0,tp=S.tapes?S.tapes.length:0;
+    const titles={dawn:'الفجر',embers:'الجمر',ash:'الرماد'};
+    const stats='مسافة الرحلة: '+km+' كم  ·  المدة: '+mins+' دقيقة'+(n?'  ·  الناجون: '+n:'')+(tp?'  ·  أشرطة سلمى: '+tp+'/7':'');
+    try{[392,494,587,784].forEach((fq,i)=>setTimeout(()=>tone(fq,2.4,.05,'sine'),i*420));}catch(e){}
+    showScreen(titles[S.ending]||'وصلت',(S.ending==='ash'?'وصلتَ، وبقيت النار.':'الرحلة انتهت. ولكن الدفء بدأ.')+'\n'+stats,false,[
+      {t:'رحلة جديدة',fn:()=>{outroOn=false;newJourney(false);}},
+      {t:'القائمة الرئيسية',fn:()=>{outroOn=false;showScreen("آخر قطار","الكوكب تجمّد. بقي قطار واحد، وفحم قليل، وأملٌ بعيد.",false,menuButtons());}}]);
+    return;
+  }
+  S.dawnT=OUTRO.length>1?outI/(OUTRO.length-1):1;ovEl.classList.add('outro');
+  showOv('<div class="pn intro"><p class="tx big">'+OUTRO[outI]+'</p><div class="pf"><button type="button" class="btn" id="oNext">'+(outI<OUTRO.length-1?'تابع':'النهاية')+'</button></div></div>');
+  $('oNext').addEventListener('click',()=>{outI++;renderOutro();});
+  try{$('oNext').focus();}catch(e){}
+}
+(function(){ // ease the dawn toward its target
+  let t0=performance.now();
+  function tk(ts){requestAnimationFrame(tk);const dt=Math.min(.1,(ts-t0)/1000);t0=ts;
+    if(typeof S==='undefined'||!S)return;
+    if(!outroOn&&mode!=='over'){ovEl.classList.remove('outro');if(S.dawn){S.dawn=0;S.dawnT=0;}return;}
+    if(S.dawnT!==undefined)S.dawn=(S.dawn||0)+(S.dawnT-(S.dawn||0))*Math.min(1,dt*.9);}
+  requestAnimationFrame(tk);
+})();
+function dawnK(){const k=S&&S.dawn?clamp((S.dawn-.3)/.6,0,1):0;return k*k*(3-2*k);}
+function drawDawnSun(){
+  const k=dawnK();if(k<=.01)return;
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  const y=330-130*k;
+  glow(480,y,420*(.5+.5*k),'255,170,90',.55*k);
+  glow(480,y,150,'255,225,170',.5*k);
+  ctx.globalCompositeOperation='source-over';
+  ctx.fillStyle='rgba(255,236,196,'+(.95*k)+')';circ(480,y,30+8*k);ctx.fill();
+  ctx.restore();
 }
 
 function flames(x,y,w,h,k){
@@ -4839,7 +4988,7 @@ function drawFg(){
   ctx.lineTo(VW+20,640);ctx.closePath();ctx.fill();
 }
 function drawSnow(){
-  const n=Math.min(snow.length,Math.round((120+S.storm*70)*clamp(VWIN/720,.8,5)));
+  const n=Math.min(snow.length,Math.round((120+S.storm*70)*clamp(VWIN/720,.8,5)*(1-.85*dawnK())));
   for(let i=0;i<n;i++){const f=snow[i];ctx.fillStyle='rgba(235,245,252,'+(.25+.5*f.z)+')';const s=.8+f.z*1.6;ctx.fillRect(f.x,f.y,s*(1+S.storm),s);}
 }
 function overlays(){
