@@ -880,7 +880,7 @@ function update(dt){
   const sn=S.snap>0?1.7:1;
   const ins=1-.18*L('insul')-(S.flags.plant?.04:0);
   const coldFront=(.85+.04*av+1.6*S.storm+1.1*S.ice+1.5*S.deep+2.5*hurStr())*(L('heat')>=3?.8:1),coldCab=(.55+.02*av+.45*S.storm+.35*S.ice+.5*S.deep+3.0*hurStr())*(1-.15*L('xchg'));
-  const cold=lerp(coldFront,coldCab,shelter)*ins*sn*DF().cold*todCold()*(S.ground&&S.surv&&S.surv.some(q=>q.k==='doc')?.92:1);
+  const cold=lerp(coldFront,coldCab,shelter)*ins*sn*DF().cold*todCold()*(S.ground&&S.surv&&S.surv.some(q=>q.k==='doc')?.92:1)*(S.ground?1.4:1);
   S.warm=clamp(S.warm+(gain-cold)*dt,0,100);
 
   /* frost, hail */
@@ -5138,7 +5138,7 @@ function music26(dt){
 let _b3=0;
 function b3Tick(dt){
   extInit();const x=X6();
-  music26(dt);try{samplesTick();tipTick(dt);ojTick(dt);tsTick(dt);}catch(e){}
+  music26(dt);try{samplesTick();hudTick(dt);tipTick(dt);ojTick(dt);tsTick(dt);}catch(e){}
   if(S.modal||mode!=='play'||S.ground||Math.abs(S.v)>.3){_b3=0;return;}
   const st=stationNow();if(st===null){_b3=0;return;}
   const i=stationIndex(st);_b3+=dt;
@@ -5153,7 +5153,7 @@ let _tipCd=0;
 let _tt=null;
 function tipTop(text,ms){
   let e=document.getElementById('tipTop');
-  if(!e){e=document.createElement('div');e.id='tipTop';e.style.cssText='position:absolute;top:6px;left:50%;transform:translateX(-50%);max-width:78%;text-align:center;font:500 11px/1.5 system-ui,sans-serif;color:#dfeaf3;background:rgba(8,16,26,.55);padding:4px 10px;border-radius:8px;z-index:6;pointer-events:none;opacity:0;transition:opacity .4s;direction:rtl';const f=document.getElementById('frame')||document.body;f.appendChild(e);}
+  if(!e){e=document.createElement('div');e.id='tipTop';e.style.cssText='position:absolute;top:34px;left:50%;transform:translateX(-50%);max-width:70%;text-align:center;font:500 11px/1.5 system-ui,sans-serif;color:#dfeaf3;background:rgba(8,16,26,.55);padding:4px 10px;border-radius:8px;z-index:6;pointer-events:none;opacity:0;transition:opacity .4s;direction:rtl';const f=document.getElementById('frame')||document.body;f.appendChild(e);}
   e.textContent=text;e.style.opacity=1;clearTimeout(_tt);_tt=setTimeout(()=>{e.style.opacity=0;},ms||7000);
 }
 function tip(id,text,ms){if(_tipCd>0||tipSeen(id))return false;tipMark(id);_tipCd=18;try{ding();}catch(e){}tipTop(text,ms||8000);return true;}
@@ -5225,7 +5225,7 @@ window.__tsN=1;window.__tsS=1;let TSM=0,FOC=100,_tsMsg=0;
 const TSL=['×١','×٢','×٣','½'];
 function tsSet(m){
   TSM=m;window.__tsN=m===1?2:m===2?3:1;window.__tsS=m===3?.5:1;
-  const b=document.getElementById('tsBtn');if(b){b.textContent=TSL[m];b.style.background=m?'rgba(255,170,70,.9)':'rgba(20,34,50,.75)';b.style.color=m?'#1a1208':'#cfe0ee';}
+  const b=document.getElementById('tsBtn');if(b){b.textContent=TSL[m];b.style.background=m===3?'radial-gradient(circle at 35% 30%,#bfe3ff,#2f7fd0)':m?'radial-gradient(circle at 35% 30%,#fff0b0,#ff5a1c)':'radial-gradient(circle at 35% 30%,#ffd28a,#e8791c)';b.style.borderColor=m===3?'#8fc6ff':'#ffb04a';b.style.color=m===3?'#06223d':'#2a1503';}
 }
 function tsDanger(){
   if(S.modal||S.ground||S.clim||S.hull<35||S.avc||S.oj&&S.oj.on)return 'danger';
@@ -5249,10 +5249,12 @@ function tsCycle(){
 }
 (function(){
   try{
-    const t=document.getElementById('touch');if(!t)return;
+    const t=document.getElementById('frame')||document.body;
+    const st=document.createElement('style');st.textContent='@keyframes tsPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,150,40,.55),0 0 14px rgba(255,150,40,.5)}50%{box-shadow:0 0 0 9px rgba(255,150,40,0),0 0 22px rgba(255,170,60,.8)}}';document.head.appendChild(st);
     const b=document.createElement('button');b.id='tsBtn';b.type='button';b.textContent='×١';
-    b.style.cssText='position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:46px;height:46px;border-radius:50%;border:1px solid rgba(160,200,230,.4);background:rgba(20,34,50,.75);color:#cfe0ee;font:700 15px system-ui;z-index:5;touch-action:manipulation';
+    b.style.cssText='position:absolute;top:10px;right:12px;width:62px;height:62px;border-radius:50%;border:3px solid #ffb04a;background:radial-gradient(circle at 35% 30%,#ffd28a,#e8791c);color:#2a1503;font:900 24px system-ui,sans-serif;z-index:8;touch-action:manipulation;direction:ltr;box-shadow:0 0 14px rgba(255,150,40,.5);animation:tsPulse 2.2s infinite;display:none';
     b.addEventListener('click',tsCycle);t.appendChild(b);
+    window.__tsShow=on=>{b.style.display=on?'block':'none';};
     window.addEventListener('keydown',e=>{if(e.key==='t'||e.key==='T')tsCycle();});
   }catch(e){}
 })();
@@ -5344,6 +5346,36 @@ function drawRoadside(){
 }
 window.__b6={setAt,SETP};
 
+/* ====== top HUD: km left, ending hints, button visibility ====== */
+const ENDH=[
+ [.08,'إذاعة متقطعة: «…من أراد الخروج من العاصمة… فالطريق شمالاً… لا يزال مفتوحاً…»'],
+ [.25,'لافتة صدئة: «العاصمة — المخرج الشمالي». يبدو أن هذه السكة تؤدي إلى الخارج.'],
+ [.5,'منتصف الطريق. على الأفق، أبراج مظلمة: هي ما تبقّى من العاصمة. تجاوزها هو الخروج.'],
+ [.75,'الهواء أقل برودة قليلاً. ربما نقترب من حدود العاصمة.'],
+ [.9,'نور بعيد خلف أبراج العاصمة. هناك الخروج. تبقّى القليل.'],
+ [.97,'بوابة العاصمة الأخيرة أمامك. عبورها يعني أنك خرجت.']
+];
+function hudTick(dt){
+  let e=document.getElementById('kmLeft');
+  const play=mode==='play'&&!S.tut&&!S.ground;
+  if(!e){e=document.createElement('div');e.id='kmLeft';e.style.cssText='position:absolute;top:6px;left:50%;transform:translateX(-50%);font:600 12px system-ui,sans-serif;color:#e6f1f9;background:rgba(8,16,26,.5);padding:3px 12px;border-radius:12px;z-index:6;pointer-events:none;direction:rtl;letter-spacing:.3px';(document.getElementById('frame')||document.body).appendChild(e);}
+  const showAll=mode==='play'&&!S.tut;
+  if(window.__tsShow)window.__tsShow(showAll&&FL('timectl'));
+  if(!showAll||!FL('kmleft')){e.style.display='none';return;}
+  e.style.display='block';
+  const left=Math.max(0,(GOAL-S.d)/1000);
+  const txt=S.endless?('اللفة '+((S.endLap|0)+1)+' · '+(left<10?left.toFixed(1):Math.round(left))+' كم'):'تبقّى '+(left<10?left.toFixed(1):Math.round(left))+' كم للخروج من العاصمة';
+  if(e._t!==txt){e._t=txt;e.textContent=txt;}
+  const x=X6();x.hint=x.hint||{};const p=S.d/GOAL;
+  if(!S.modal&&!S.ground){for(let k=0;k<ENDH.length;k++){if(p>=ENDH[k][0]&&!x.hint[k]){x.hint[k]=1;say('📻 '+ENDH[k][1],7500);break;}}}
+}
+function drawOverShell(){
+  const k=clamp((.6-ZOOM)/.18,0,1);if(k<.02||S.ground)return;
+  ctx.save();beginPose(playerPoseP());
+  ctx.translate(TL+S.px,FLOOR);const s=1+.9*k;ctx.scale(s,s);ctx.translate(-(TL+S.px),-FLOOR);
+  drawPlayer();ctx.restore();
+}
+
 /* ===== DEVELOPER BUILD ONLY: test panel ===== */
 (function(){
   const st=document.createElement('style');
@@ -5361,7 +5393,7 @@ window.__b6={setAt,SETP};
   function build(){
     p.innerHTML='';
     H('ميزات (أخضر = شغّالة)');
-    const FEATS=[['surv','الناجون'],['switch','مفترقات السكة'],['wolves','ذئاب الليل'],['tapes','أشرطة سلمى'],['towers','أبراج المياه'],['marks','المعالم'],['tod','ليل ونهار'],['bio','تغيّر المناظر'],['amb','شفق متغيّر'],['events','أحداث عشوائية'],['hur','الأعاصير'],['zones','المناطق الخطرة'],['depth','عمق وأشجار قريبة'],['bloom','توهج'],['grain','حبيبات'],['gov','ضبط الجودة تلقائي'],['lamp','ضوء الغرف'],['d3','عمق 3D'],['hills','المنحدرات'],['bridges','الجسور الهشّة'],['av','الانهيار الثلجي'],['roof','شغلات السقف'],['trader','التاجر'],['camp','سهرات النار'],['camera','الكاميرا'],['outjob','شغل خارج القطار'],['timectl','التحكم بالزمن'],['speed2','سرعة ١٦٠'],['music','الموسيقى الخلفية'],['rollsnd','صوت العجلات الحقيقي'],['scenery','مجسمات الطريق']];
+    const FEATS=[['surv','الناجون'],['switch','مفترقات السكة'],['wolves','ذئاب الليل'],['tapes','أشرطة سلمى'],['towers','أبراج المياه'],['marks','المعالم'],['tod','ليل ونهار'],['bio','تغيّر المناظر'],['amb','شفق متغيّر'],['events','أحداث عشوائية'],['hur','الأعاصير'],['zones','المناطق الخطرة'],['depth','عمق وأشجار قريبة'],['bloom','توهج'],['grain','حبيبات'],['gov','ضبط الجودة تلقائي'],['lamp','ضوء الغرف'],['d3','عمق 3D'],['hills','المنحدرات'],['bridges','الجسور الهشّة'],['av','الانهيار الثلجي'],['roof','شغلات السقف'],['trader','التاجر'],['camp','سهرات النار'],['camera','الكاميرا'],['outjob','شغل خارج القطار'],['timectl','التحكم بالزمن'],['speed2','سرعة ١٦٠'],['music','الموسيقى الخلفية'],['rollsnd','صوت العجلات الحقيقي'],['scenery','مجسمات الطريق'],['kmleft','عدّاد الكيلومترات']];
     FEATS.forEach(([k,n])=>{const b=B(n,()=>{window.__F=window.__F||{};window.__F[k]=!FL(k);try{localStorage.setItem('lt_flags',JSON.stringify(window.__F));}catch(e){}paint();});b.dataset.k=k;p.appendChild(b);});
     const paint=()=>p.querySelectorAll('button[data-k]').forEach(b=>b.classList.toggle('on',FL(b.dataset.k)));paint();
     A('الكل شغّال',()=>{window.__F={lamp:false};try{localStorage.setItem('lt_flags',JSON.stringify(window.__F));}catch(e){}paint();});
@@ -5842,7 +5874,7 @@ function render(){
   for(let i=0;i<STATIONS.length;i++)drawStation(i);
   drawGoal();drawTunnelBack();drawTrack();drawBridges();trainShadow();drawDrifts();drawBreaks();drawBlocks();drawDebris();drawSites();drawCreatures();drawPack();drawWowBack();fogLayer(S.fog,false);
   ctx.save();ctx.translate(0,Math.sin(S.t*38)*S.bump*1.4);
-  ctx.save();trainScale();drawHeap();drawRearCars();ctx.save();ctx.translate(TL,0);beginPose(locoPose());ctx.translate(-TL,0);drawTrain();drawUpgrades();drawStoke();drawHurTrain();drawCabExtras();drawCabBrake();drawWhistle();drawRoofFx();drawGauges();drawCargo();drawWheelHeat();drawDoorEtc();fireLight();ctx.restore();drawSurvivors();d3Bevel();drawCamProp();ctx.restore();if(!S.ground){beginPose(playerPoseP());drawPlayer();ctx.restore();}drawShell();ctx.restore();drawCrates();drawLandmarks();drawTowers();drawSwitches();drawMerchant();drawStopFronts();drawLadderMark();drawZonesFx();if(S.ground)drawGroundPlayer();drawWowFront();drawAvChase();
+  ctx.save();trainScale();drawHeap();drawRearCars();ctx.save();ctx.translate(TL,0);beginPose(locoPose());ctx.translate(-TL,0);drawTrain();drawUpgrades();drawStoke();drawHurTrain();drawCabExtras();drawCabBrake();drawWhistle();drawRoofFx();drawGauges();drawCargo();drawWheelHeat();drawDoorEtc();fireLight();ctx.restore();drawSurvivors();d3Bevel();drawCamProp();ctx.restore();if(!S.ground){beginPose(playerPoseP());drawPlayer();ctx.restore();}drawShell();drawOverShell();ctx.restore();drawCrates();drawLandmarks();drawTowers();drawSwitches();drawMerchant();drawStopFronts();drawLadderMark();drawZonesFx();if(S.ground)drawGroundPlayer();drawWowFront();drawAvChase();
   ctx.restore();
   drawTargetMarker();drawPromptTag();
   ctx.restore();
