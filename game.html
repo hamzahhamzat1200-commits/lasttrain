@@ -145,6 +145,8 @@ const TARGETS=[
   {id:'coal',x:262,r:44,y:FLOOR-80},
   {id:'load',x:342,r:28,y:FLOOR-80},
   {id:'furnace',x:432,r:32,y:FLOOR-86},
+  {id:'roof',x:60,r:16,y:FLOOR-80},
+  {id:'whistle',x:476,r:9,y:FLOOR-96},
   {id:'water',x:503,r:15,y:FLOOR-60},
   {id:'lever',x:564,r:20,y:FLOOR-90},
   {id:'door',x:606,r:24,y:FLOOR-70},
@@ -295,6 +297,7 @@ function genWorld(seed){
   }
   d=400;while(d<GOAL){SCENES.push({x:Math.round(d+ur(0,400)),k:Math.floor(R()*12),s:+ur(.8,1.4).toFixed(2),par:.55});d+=ur(700,1500);}
   STATIONS.sort((a,b)=>a-b);BREAKS.sort((a,b)=>a-b);DRIFTS.sort((a,b)=>a[0]-b[0]);STORIES.sort((a,b)=>a.x-b.x);WRECKS.sort((a,b)=>a.x-b.x);
+  try{hillGen(seed);}catch(e){}
   buildElev();
   if(typeof genZones==='function')genZones();
   if(typeof extGen==='function')extGen(seed);
@@ -315,7 +318,7 @@ function buildElev(){
 }
 function elevM(d){const f=Math.max(0,Math.min(ELEV.length-2,d/ELS)),i=Math.floor(f);return ELEV[i]+(ELEV[i+1]-ELEV[i])*(f-i);}
 function ey(d){return -(elevM(d)-EY0)*PX;}
-function grade(d){return (0.007*Math.sin(d*0.011)+0.009*Math.sin(d*0.0037+1))*sstep(250,500,d);}
+function grade(d){return (0.007*Math.sin(d*0.011)+0.009*Math.sin(d*0.0037+1))*sstep(250,500,d)+(typeof hillG==='function'?hillG(d):0);}
 function zoneAt(arr,d,fi,fo){let s=0;for(const z of arr){if(d<z[0]-fi-20||d>z[1]+fo+20)continue;s=Math.max(s,sstep(z[0]-fi,z[0]+fi*.5,d)*(1-sstep(z[1]-fo*.5,z[1]+fo,d)));}return s;}
 function fogAt(d){return zoneAt(FOGS,d,350,350);}
 function iceAt(d){return zoneAt(ICES,d,300,300);}
@@ -482,6 +485,8 @@ function promptFor(t){
     case 'lever':return {l:S.work==='lever'?'حرّك يميناً أو يساراً':'ذراع الدفع',hold:1};
     case 'brake':return {l:S.brkOn?'حرّر المكبح':'اسحب المكبح'};
     case 'pipe':return S.leak?{l:'سدّ التسريب',hold:1}:null;
+    case 'roof':return ((S.chim||0)>.08||(S.roofSnow||0)>.08)?{l:'اصعد إلى السطح ونظّف الثلج',hold:1}:{l:'السطح نظيف',dead:true};
+    case 'whistle':return (S.whCd>0||S.P<10)?{l:'الصفّارة تستريح',dead:true}:{l:'اسحب حبل الصفّارة'};
     case 'bench':return {l:'ماكينة الإصلاح والورشة'};
     case 'front':{
       if(blocked)return {l:'أصلح السكة',hold:1};
@@ -503,7 +508,7 @@ const SAVE_KEY='lasttrain.v3';
 function saveGame(){
   try{
     if(!S||S.over||S.tut)return;
-    const o={seed:S.seed,d:S.d,hull:S.hull,coalPile:S.coalPile,scrap:S.scrap,upg:S.upg,flags:S.flags,fixed:S.fixed,cleared:S.cleared,looted:S.looted,told:S.told,done:S.done,itemsTaken:S.itemsTaken,cargo:S.cargo,crateN:S.crateN,crateTaken:S.crateTaken,loadN:S.loadN,W:S.W,playT:S.playT,fuel:S.fuel,surv:S.surv,tapes:S.tapes,log:S.log,swc:S.swc,survCold:S.survCold};
+    const o={seed:S.seed,d:S.d,hull:S.hull,coalPile:S.coalPile,scrap:S.scrap,upg:S.upg,flags:S.flags,fixed:S.fixed,cleared:S.cleared,looted:S.looted,told:S.told,done:S.done,itemsTaken:S.itemsTaken,cargo:S.cargo,crateN:S.crateN,crateTaken:S.crateTaken,loadN:S.loadN,W:S.W,playT:S.playT,fuel:S.fuel,surv:S.surv,tapes:S.tapes,log:S.log,swc:S.swc,survCold:S.survCold,hf:S.hidFound,hn:S.hidN,wn:S.whN,wr:S.wmRead,fo:S.fireOut,rs:S.roofSnow,ch:S.chim,ai:S.avInit,ah:S.avHit};
     localStorage.setItem(SAVE_KEY,JSON.stringify(o));
   }catch(e){}
 }
@@ -512,7 +517,7 @@ function clearSave(){try{localStorage.removeItem(SAVE_KEY);}catch(e){}}
 function restoreFrom(o){
   genWorld(o.seed);
   S=newState(true,o.seed);
-  Object.assign(S,{d:Math.max(0,o.d-30),hull:o.hull,coalPile:o.coalPile,scrap:o.scrap,upg:o.upg||{},flags:o.flags||{},fixed:o.fixed||{},cleared:o.cleared||{},looted:o.looted||{},told:o.told||{},done:o.done||{},itemsTaken:o.itemsTaken||{},cargo:o.cargo||[],crateN:o.crateN||0,crateTaken:o.crateTaken||{},loadN:o.loadN||{},W:Math.max(60,o.W||80),playT:o.playT||0,fuel:Math.max(2.5,o.fuel||0),P:60,Tf:.5,warm:100,surv:o.surv||[],tapes:o.tapes||[],log:o.log||[],swc:o.swc||{},survCold:o.survCold||0,_ext:1,todSaid:-1,pack:null,groundT:0,tapePlay:null});
+  Object.assign(S,{d:Math.max(0,o.d-30),hull:o.hull,coalPile:o.coalPile,scrap:o.scrap,upg:o.upg||{},flags:o.flags||{},fixed:o.fixed||{},cleared:o.cleared||{},looted:o.looted||{},told:o.told||{},done:o.done||{},itemsTaken:o.itemsTaken||{},cargo:o.cargo||[],crateN:o.crateN||0,crateTaken:o.crateTaken||{},loadN:o.loadN||{},W:Math.max(60,o.W||80),playT:o.playT||0,fuel:Math.max(2.5,o.fuel||0),P:60,Tf:.5,warm:100,surv:o.surv||[],tapes:o.tapes||[],log:o.log||[],swc:o.swc||{},survCold:o.survCold||0,hidFound:o.hf||{},hidN:o.hn||0,whN:o.wn||0,wmRead:o.wr||0,fireOut:o.fo||0,roofSnow:o.rs||0,chim:o.ch||0,avInit:o.ai||0,avHit:o.ah||0,_ext:1,todSaid:-1,pack:null,groundT:0,tapePlay:null});
 }
 
 
@@ -664,6 +669,8 @@ function update(dt){
       case 'brake':if(pressed)toggleBrake();break;
       case 'water':if(act&&S.W<99.5)work='water';break;
       case 'pipe':if(act&&S.leak)work='leakfix';break;
+      case 'roof':if(act&&((S.chim||0)>.08||(S.roofSnow||0)>.08))work='roof';break;
+      case 'whistle':if(pressed)whistle();break;
       case 'bench':if(pressed){S.benchOpened=true;openUpgrades();return;}break;
       case 'front':
         if(act){if(blocked)work='repair';else if(site&&site.type==='wreck')work='search';}
@@ -710,6 +717,7 @@ function update(dt){
       if(S.loadN[st]>=6){const si=stationIndex(st);S.scrap+=3+((si*5)%4);S.looted[st]=true;tone(440,.25,.09);say('اكتمل التحميل، وجمعتَ بعض القطع.',3200);saveGame();}}
   }else S.load=Math.max(0,S.load-dt*2);
   if(work==='water'){const _tw=atTower();S.W=Math.min(100,S.W+(_tw?45:9*clamp(.25+S.Tf*1.5,.25,1))*dt);if(_tw&&Math.random()<.4)S.spray.push({x:TL+503+rnd(-4,4),y:FLOOR-150,vx:rnd(-20,20),vy:rnd(20,80),a:.9,r:rnd(1.5,3)});S.Tf*=Math.exp(-.04*dt);if(Math.random()<.15)burst(2600,.08,.05,2);}
+  if(work==='roof')roofWork(dt);
   if(work==='leakfix'){S.leakFix+=dt;if(Math.random()<.3)burst(1800,.05,.08,3);if(S.leakFix>=3){S.leak=false;S.leakFix=0;tone(520,.25,.09);say('سددتَ التسريب.',2600);}}
   else S.leakFix=Math.max(0,S.leakFix-dt);
   const wsite=work==='gsearch'?near.site:site;
@@ -781,7 +789,7 @@ function update(dt){
   const Kp=18*(1+.1*L('engine'));
   const tdir=S.thr<0?-1:1;
   const Fraw=Kp*ta*pf/Math.max(av,2.5);
-  const mu=(.62-.12*S.storm)*(L('sand')>0?1.35:1);
+  const mu=(.62-.12*S.storm)*(L('sand')>0?1.35:1)*(1-clamp(grade(S.d),0,.04)*5);
   const adh=mu*3.6;
   S.slip=Fraw>adh*1.9&&av<8&&S.brake<.2;
   let aTr=Math.min(2.4+.2*L('engine'),Fraw);
@@ -789,9 +797,9 @@ function update(dt){
   if(tdir<0)aTr*=.5;
   aTr*=tdir*(1-S.brake*.95)*(S.hull>0?1:0);
   const drag=1-.4*L('plow');
-  const aRes=.12+.0014*av*av+S.storm*.06+S.ice*.05+S.rime*.04;
+  const aRes=.12+.0014*av*av+S.storm*.06+S.ice*.05+S.rime*.04+.07*(S.roofSnow||0);
   const aGr=9.81*grade(S.d);
-  const aDr=driftAt(S.d)*1.05*drag;
+  const aDr=driftAt(S.d)*1.05*drag+(S.buryT>0?.8:0);
   const aBr=S.brake*3.3*(1+.2*L('brakes'));
   const sg=S.v>.03?1:S.v<-.03?-1:0;
   let a;
@@ -1336,7 +1344,7 @@ function interior(x,y,w,h,top,bot,planks){
 }
 function roof(x0,x1,seed,yTop){
   ctx.fillStyle='#22374b';ctx.fillRect(x0-4,yTop,x1-x0+8,9);
-  ctx.fillStyle='#e6f2f8';rr(x0-6,yTop-5,x1-x0+12,6,3);ctx.fill();
+  ctx.fillStyle='#e6f2f8';rr(x0-6,yTop-5-(S.roofSnow||0)*12,x1-x0+12,6+(S.roofSnow||0)*12,3);ctx.fill();
   ctx.fillStyle='rgba(230,242,248,.55)';ctx.fillRect(x0-4,yTop+8,x1-x0+8,1);
   for(let i=0;i<10;i++){const ix=x0+4+hash(seed+i)*(x1-x0-8),l=5+hash(seed*3+i)*13;
     ctx.fillStyle='rgba(215,236,247,.85)';ctx.beginPath();ctx.moveTo(ix-2,yTop+9);ctx.lineTo(ix+2,yTop+9);ctx.lineTo(ix,yTop+9+l);ctx.fill();}
@@ -4096,6 +4104,7 @@ function extGen(seed){
     SWITCHES.push({x});d=x+ur(52000,68000);}
   d=2600;while(d<GOAL-1500){MARKS.push({x:Math.round(d),k:Math.floor(R()*7),s:+ur(.85,1.25).toFixed(2),side:R()<.5?1:0,lit:R()<.35});d+=ur(2600,5200);}
   const n=WRECKS.length;for(let k=0;k<7;k++)TAPEW[Math.min(n-1,Math.floor((k+.5)*n/7))]=k;
+  try{hidGen(R,ur);}catch(e){}
 }
 function extInit(){
   if(S._ext)return;S._ext=1;
@@ -4176,7 +4185,7 @@ function openSwitch(sw){
    '<div class="pf"><button type="button" class="btn" id="swS">الطريق الشمالي</button><button type="button" class="btn alt" id="swL">الطريق الجنوبي</button></div></div>');
   const go=c=>{S.swc[sw.x]=c;applySwitchWorld(sw.x,c);S.log.push({t:'مفترق السكة',r:c==='short'?'سلكتَ الطريق الشمالي القصير عبر الصقيع.':'سلكتَ الطريق الجنوبي الطويل.',d:Math.round(S.d)});
     closeModal();
-    if(c==='short'){S.d=sw.x+6000;S.lastJoint=Math.floor(S.d/12);camera(0,true);S.shake=.3;burst(900,.4,.15,1.5);say('حوّلتَ السكة شمالاً. الهواء هنا أبرد بكثير… أبقِ النار عالية.',5200);}
+    if(c==='short'){S.northStart=S.hull;S.northEnd=sw.x+6000+2800;S.d=sw.x+6000;S.lastJoint=Math.floor(S.d/12);camera(0,true);S.shake=.3;burst(900,.4,.15,1.5);say('حوّلتَ السكة شمالاً. الهواء هنا أبرد بكثير… أبقِ النار عالية.',5200);}
     else say('حوّلتَ السكة جنوباً. الطريق أطول، لكن الفانوس البرتقالي يلمع على الجانبين.',5200);
     saveGame();};
   $('swS').addEventListener('click',()=>go('short'));$('swL').addEventListener('click',()=>go('long'));
@@ -4350,7 +4359,7 @@ function openJournal(back){
   const lg=S.log.length?S.log.slice().reverse().map(e=>'<div class="uc"><div class="un"><b>'+e.t+'</b><span class="lv">كم '+(e.d/1000).toFixed(1)+'</span></div><p>'+e.r+'</p></div>').join(''):'<div class="uc"><p>الصفحات ما زالت فارغة.</p></div>';
   showOv('<div class="pn"><div class="ph"><h2>دفتر الرحلة</h2><span class="sc">اليوم '+t.day_n+' · '+km+' من '+tot+' كم</span></div><div class="ug" style="grid-template-columns:minmax(0,1fr)">'+
     '<div class="uc"><p>محطات: '+st+' · قصص: '+Object.keys(S.told).length+' · أشرطة: '+S.tapes.length+'/'+TAPES.length+' · ناجون: '+S.surv.length+'/'+survCap()+'</p></div>'+
-    '<h3 style="margin:6px 0 0;font-size:16px">الناجون</h3>'+sv+'<h3 style="margin:6px 0 0;font-size:16px">أشرطة سلمى</h3>'+tp+'<h3 style="margin:6px 0 0;font-size:16px">ما حدث</h3>'+lg+
+    '<h3 style="margin:6px 0 0;font-size:16px">الناجون</h3>'+sv+'<h3 style="margin:6px 0 0;font-size:16px">أشرطة سلمى</h3>'+tp+'<h3 style="margin:6px 0 0;font-size:16px">ما حدث</h3>'+lg+(typeof journalExtra==='function'?journalExtra():'')+
     '</div><div class="pf"><button type="button" class="btn" id="jClose">أغلق الدفتر</button></div></div>');
   ovEl.querySelectorAll('[data-tp]').forEach(b=>b.addEventListener('click',()=>{S.modal='journal';playTape(+b.dataset.tp);try{if(AC&&AC.resume)AC.resume();}catch(e){}}));
   $('jClose').addEventListener('click',()=>{if(wasPause){S.modal='pause';renderPause();}else closeModal();});
@@ -4360,6 +4369,7 @@ addEventListener('keydown',e=>{if(e.code==='KeyJ'&&mode==='play'&&S&&!S.over&&!S
 function extUpdate(dt){
   extInit();
   if(S.modal)return;
+  batch1Tick(dt);hillTick();bridgeTick(dt);avTick(dt);roofTick(dt);
   if(FL('tod'))todTick();if(FL('wolves'))packTick(dt);if(FL('surv'))survTick(dt);if(FL('tapes'))tapeTick(dt);
   if(FL('switch'))for(const sw of SWITCHES){if(S.swc[sw.x])continue;
     if(S.d>sw.x){S.swc[sw.x]='long';applySwitchWorld(sw.x,'long');continue;}
@@ -4503,7 +4513,7 @@ window.__clackSynth=(ac,dest,t0,v,vol)=>clackSynth(ac,dest,t0,v,vol);
 /* ---------- the ending: a long, cathartic finale with a dawn that rises behind the text ---------- */
 let outroOn=false;
 function startOutro(){
-  outroOn=true;
+  outroOn=true;try{achWin();}catch(e){}
   const f=S.flags||{},H=hopeScore(),greed=!!f.greed;
   const best=H>=7&&!greed,mid=!best&&H>=3;
   const who=(f.layla||best)?'ليلى':'امرأةٌ بمعطف المهندسين';
@@ -4594,6 +4604,324 @@ function drawDawnSun(){
   ctx.fillStyle='rgba(255,236,196,'+(.95*k)+')';circ(480,y,30+8*k);ctx.fill();
   ctx.restore();
 }
+
+/* ====== batch 1: whistle, hidden survivors, achievements, wall messages ====== */
+var HIDERS=[];
+/* ---------- achievements (persist across journeys) ---------- */
+const ACH=[
+ {id:'win',t:'الواصل',d:'أوصل القطار إلى الوادي.'},
+ {id:'nofire',t:'جمرة لا تنطفئ',d:'أوصل القطار دون أن تنطفئ النار ولو مرة.'},
+ {id:'allsurv',t:'قطار مليء',d:'خذ كل الناجين الأربعة معك.'},
+ {id:'tapes7',t:'صوت سلمى',d:'اسمع كل أشرطة سلمى السبعة.'},
+ {id:'north',t:'الطريق الشمالي',d:'اقطع الطريق الشمالي دون أي ضرر بالهيكل.'},
+ {id:'wm10',t:'قارئ الجدران',d:'اقرأ عشر رسائل على جدران المحطات.'},
+ {id:'wmwrite',t:'أثرٌ باسمك',d:'اترك رسالة على جدار محطة.'},
+ {id:'hid3',t:'من يسمع الصفير',d:'اعثر على ثلاثة ناجين مختبئين بالصفّارة.'},
+ {id:'whistle30',t:'صوت القطار',d:'أطلق الصفّارة ثلاثين مرة.'},
+ {id:'avalanche',t:'أسرع من الجبل',d:'انجُ من كل الانهيارات الثلجية في رحلة واحدة.'},
+ {id:'photos10',t:'عين المصوّر',d:'التقط عشر صور بالكاميرا القديمة.'},
+ {id:'trader5',t:'ابن السوق',d:'أنجز خمس صفقات مع التاجر الغامض.'},
+ {id:'endless50',t:'سكة بلا نهاية',d:'اقطع خمسين كيلومتراً في الوضع اللانهائي.'}
+];
+function achLoad(){try{return JSON.parse(localStorage.getItem('lt_ach')||'{}')||{};}catch(e){return {};}}
+function ach(id){
+  const A=achLoad();if(A[id])return;A[id]=1;
+  try{localStorage.setItem('lt_ach',JSON.stringify(A));}catch(e){}
+  const a=ACH.find(x=>x.id===id);if(!a)return;
+  try{ding();say('إنجاز جديد: «'+a.t+'»',4600);}catch(e){}
+}
+function achWin(){
+  ach('win');if(!S.fireOut)ach('nofire');
+  if((S.avInit||0)>=2&&!S.avHit)ach('avalanche');
+}
+function journalExtra(){
+  const A=achLoad(),n=ACH.filter(a=>A[a.id]).length;
+  const rows=ACH.map(a=>'<div class="uc'+(A[a.id]?'':' full')+'"><div class="un"><b>'+(A[a.id]?a.t:'إنجاز مخفي')+'</b><span class="lv">'+(A[a.id]?'✓':'·')+'</span></div><p>'+(A[a.id]?a.d:a.d)+'</p></div>').join('');
+  return '<h3 style="margin:6px 0 0;font-size:16px">الإنجازات ('+n+'/'+ACH.length+')</h3>'+rows;
+}
+/* ---------- whistle ---------- */
+function whistleSound(vol,lp){
+  if(!AC||muted)return;
+  const t=AC.currentTime,g=AC.createGain(),f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=lp||3200;
+  g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(vol,t+.06);g.gain.setValueAtTime(vol,t+.95);g.gain.exponentialRampToValueAtTime(.0005,t+1.5);
+  f.connect(g);g.connect(master);
+  const lfo=AC.createOscillator(),lg=AC.createGain();lfo.frequency.value=5.2;lg.gain.value=4;lfo.connect(lg);lfo.start(t);lfo.stop(t+1.6);
+  [[349,.5],[440,.45],[523,.38]].forEach(([fq,a])=>{
+    const o=AC.createOscillator(),og=AC.createGain();o.type='sawtooth';o.frequency.setValueAtTime(fq*.86,t);o.frequency.exponentialRampToValueAtTime(fq,t+.12);lg.connect(o.frequency);
+    og.gain.value=a;o.connect(og);og.connect(f);o.start(t);o.stop(t+1.6);});
+  const n=nsrc(),nb=AC.createBiquadFilter(),ng=AC.createGain();nb.type='bandpass';nb.frequency.value=4200;nb.Q.value=.7;
+  ng.gain.setValueAtTime(.0001,t);ng.gain.linearRampToValueAtTime(vol*.7,t+.05);ng.gain.exponentialRampToValueAtTime(.0005,t+1.5);
+  n.connect(nb);nb.connect(ng);ng.connect(master);n.start(t,n._o,1.6);
+}
+function whistle(){
+  extInit();
+  if(S.whCd>0||S.P<10)return;
+  S.whCd=6;S.P=Math.max(0,S.P-7);S.whT=1.6;S.whN=(S.whN||0)+1;
+  whistleSound(.07,3200);
+  try{S.sparks.length;}catch(e){}
+  S.bellT=Math.max(S.bellT||0,3.5);
+  if(S.pack){S.pack.leave=true;say('الذئاب ارتدّت عن الصفير وتفرّقت في الثلج.',4200);}
+  if(S.whN>=30)ach('whistle30');
+  // hidden survivors answer the call
+  let found=false;
+  for(const h of HIDERS){if(S.hidFound[h.x])continue;if(Math.abs(S.d-h.x)<650){S.hidFound[h.x]=1;S.hidN=(S.hidN||0)+1;found=true;hidReward(h);break;}}
+  // echo in fog / storm
+  if(!found&&(S.fog>.25||S.storm>.3)){
+    const ns=nextStationAhead();
+    setTimeout(()=>{if(mode!=='play')return;whistleSound(.025,1500);
+      if(ns!==null&&ns-(S.d-TENDER_OFF)<4200&&ns-(S.d-TENDER_OFF)>0)say('عاد الصدى من بعيد… محطة على بعد نحو '+Math.max(1,Math.round((ns-(S.d-TENDER_OFF))/1000))+' كم.',5200);
+      else say('عاد الصدى فارغاً. لا شيء قريب.',3600);},1500);
+  }
+  if(S.hidN>=3)ach('hid3');
+}
+function hidReward(h){
+  setTimeout(()=>{if(mode!=='play')return;
+    const r=h.k;
+    if(r===0){S.coalPile=Math.min(pileCap(),S.coalPile+5);say('من نافذةٍ منهارة لوّح لك رجلٌ مختبئ. ترك عند السكة كيس فحم، ثم اختفى.',6400);S.log.push({t:'مختبئ يلوّح',r:'ردّ على صفيرك رجل وترك لك كيس فحم.',d:Math.round(S.d)});}
+    else if(r===1){S.scrap+=16;say('امرأة أطلّت من قبوٍ تحت المحطة. أعطتك حفنة قطع حديد وقالت: «اذهبوا بسلام».',6400);S.log.push({t:'مختبئة في القبو',r:'أعطتك امرأة قطعاً معدنية ودعت لك.',d:Math.round(S.d)});}
+    else{S.flags=Object.assign({},S.flags,{drawings:1});S.warm=Math.min(100,S.warm+25);say('طفلٌ خلف حاجز الثلج رسم لك على زجاج النافذة قطاراً صغيراً. شعرتَ بشيءٍ دافئ.',6400);S.log.push({t:'طفل يرسم',r:'رسم لك طفل قطاراً على الزجاج.',d:Math.round(S.d)});}
+    ding();},1800);
+}
+function hidGen(R,ur){
+  HIDERS=[];let d=9000+ur(0,4000);
+  while(d<GOAL-12000){
+    let x=Math.round(d);while(STATIONS.some(s=>Math.abs(s-x)<900)||STORIES.some(s=>Math.abs(s.x-x)<800))x+=300;
+    HIDERS.push({x,k:Math.floor(R()*3)});d=x+ur(14000,24000);}
+}
+function drawWhistle(){
+  ctx.save();ctx.translate(TL,0);
+  const x=476,y=FLOOR-104;
+  ctx.fillStyle='#b78b3e';rr(x-4,y-8,8,9,2);ctx.fill();ctx.fillStyle='#d9b062';ctx.fillRect(x-3,y-7,2,7);
+  ctx.strokeStyle='#9aa8b3';ctx.lineWidth=1.1;ctx.setLineDash([2,1.6]);ctx.beginPath();ctx.moveTo(x,y+1);ctx.lineTo(x+(S.whT>0?Math.sin(S.t*30)*1.6:0),y+18);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#b78b3e';circ(x,y+19,2.2);ctx.fill();
+  if(S.whT>0){const k=S.whT/1.6;
+    ctx.save();ctx.globalCompositeOperation='lighter';
+    for(let i=0;i<7;i++){const a=(1-k)+i*.09,r=3+a*22,yy=y-6-a*34;ctx.fillStyle='rgba(235,245,252,'+(.17*Math.max(0,1-a))+')';circ(x+a*8,yy,r);ctx.fill();}
+    ctx.restore();}
+  ctx.restore();
+}
+/* ---------- wall messages ---------- */
+const WM=[
+ '«إلى من يقرأ هذا: ابقَ دافئاً.»','«اسمي سامر. جئتُ من المرفأ مشياً. إن وجدتم أمي فقولوا لها إنني حاولت.»',
+ '«النار أولاً. الطعام ثانياً. الحزن بعد ذلك.»','«لا تثق بالجليد الأزرق. هو يبتسم ثم يبتلع.»',
+ '«ثلاثة أيام بلا نار. أكتب هذا لأن أصابعي ما زالت تتحرك.»','«نور، ذهبتُ شمالاً. إن عدتِ فاتبعي الدخان.»',
+ '«المحطة التي بعد هذه فيها ماء. التي قبلها فيها ذئاب.»','«كنتُ هنا. وكنتُ حيّاً.»',
+ '«لا تتوقف عند المنحنى الثالث. الريح تأكل الصوت.»','«شكراً لمن ترك الفحم هنا. شربتُ بفضلك شاياً ساخناً.»',
+ '«أيها السائق: شكراً لأنك مررت.»','«قال لي أبي: القطار لا يتوقف. توقف أبي. ولم يتوقف القطار.»',
+ '«عدّتُ أيامي بالخطوط على هذا الجدار. وصلتُ إلى الأربعين ثم نسيت.»','«سمعتُ قطاراً ليلة أمس. ظننتُه حلماً.»',
+ '«من يقرأ هذا ويملك قلباً فليترك شيئاً للمارّ بعده.»','«أحبكِ يا منى. أنا في الوادي. تعالي.»',
+ '«لا تفتح الصناديق الزرقاء. فارغة، وفيها خيبة.»','«نمتُ هنا ليلة. الجدار أدفأ مما يبدو.»',
+ '«الذئاب تخاف الصفير والنار. تذكّر ذلك.»','«كتبتُ اسمي لئلا أنساه.»',
+ '«أحدهم ينادي كل ليلة من الشرق. لا أجرؤ على الذهاب.»','«جدي قال إن الشمس ستعود. لم يقل متى.»',
+ '«إن كنتَ آخر من يقرأ هذا: أطفئ الضوء حين تغادر. لا. لا تطفئه.»','«تركتُ لكم بطانية تحت المقعد الثالث.»'
+];
+function wmHint(){
+  const c=CRATES.find(q=>q.x>S.d+800);
+  if(c&&Math.random()<.55)return '\nبخطٍّ مختلف في الأسفل: «صندوق فحم بعد نحو '+Math.max(1,Math.round((c.x-S.d)/1000))+' كم. لا تمرّ عليه.»';
+  return '';
+}
+function wmTick(){
+  const st=stationNow();if(st===null){return;}
+  if(S.said['wm'+st])return;S.said['wm'+st]=1;
+  S.wmRead=(S.wmRead||0)+1;
+  let msgs=[];try{msgs=JSON.parse(localStorage.getItem('lt_msgs')||'[]')||[];}catch(e){}
+  let txt;
+  if(msgs.length&&Math.random()<.25)txt='على الجدار خطٌّ تعرفه جيداً. خطّك:\n«'+msgs[Math.floor(Math.random()*msgs.length)]+'»';
+  else txt='كُتب على جدار المحطة:\n'+WM[Math.floor(Math.random()*WM.length)]+wmHint();
+  setTimeout(()=>{if(mode==='play'&&!S.modal)say(txt,7600);},1400);
+  if(S.wmRead>=10)ach('wm10');
+  const idx=stationIndex(st);
+  if(idx===0||idx===9||idx===19||idx===STATIONS.length-1)setTimeout(()=>wallWrite(),9500);
+}
+function wallWrite(){
+  if(mode!=='play'||S.modal||Math.abs(S.v)>.5)return;
+  openModal('wall');
+  showOv('<div class="pn"><div class="ph"><h2>جدار المحطة</h2></div><div class="sb"><p class="tx">القلم الفحمي ما زال على الرفّ. هل تترك رسالة لمن يمرّ بعدك؟</p>'+
+    '<input id="wmIn" maxlength="60" placeholder="اكتب رسالتك" style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #3b5870;background:#0c1826;color:#e6f0f7;font:15px system-ui;direction:rtl"></div>'+
+    '<div class="pf"><button type="button" class="btn" id="wmOk">اكتب</button><button type="button" class="btn alt" id="wmNo">ليس الآن</button></div></div>');
+  $('wmOk').addEventListener('click',()=>{const v=($('wmIn').value||'').trim().slice(0,60);
+    if(v){let m=[];try{m=JSON.parse(localStorage.getItem('lt_msgs')||'[]')||[];}catch(e){}m.push(v);if(m.length>24)m.shift();try{localStorage.setItem('lt_msgs',JSON.stringify(m));}catch(e){}
+      S.log.push({t:'رسالة على الجدار',r:'كتبتَ: «'+v+'»',d:Math.round(S.d)});ach('wmwrite');}
+    closeModal();});
+  $('wmNo').addEventListener('click',closeModal);
+}
+/* ---------- per-frame glue ---------- */
+let _b1t=0;
+function batch1Tick(dt){
+  extInit();S.hidFound=S.hidFound||{};
+  if(S.whCd>0)S.whCd-=dt;if(S.whT>0)S.whT-=dt;
+  if(S.Tf<.03&&S.v>1&&!S.tut)S.fireOut=1;
+  wmTick();
+  _b1t+=dt;if(_b1t>1){_b1t=0;
+    if(S.surv.length>=4)ach('allsurv');
+    if(S.tapes.length>=7)ach('tapes7');
+    if(S.northStart!==undefined&&S.d>S.northEnd){if(S.hull>=S.northStart)ach('north');S.northStart=undefined;}
+  }
+}
+
+/* ====== batch 2: steep hills, fragile bridges, chasing avalanche, roof chores ====== */
+var HILLS=[],BRIDGES=[],AVC=[];
+function hillG(d){
+  let g=0;for(const h of HILLS){const u=d-h.x;if(u<0||u>h.L*2)continue;
+    g+=h.dir*h.A*(u<h.L?Math.sin(Math.PI*u/h.L):-Math.sin(Math.PI*(u-h.L)/h.L));}
+  return g;
+}
+function hillGen(seed){
+  const R=mulberry(seed*17+3),ur=(a,b)=>a+R()*(b-a);
+  HILLS=[];BRIDGES=[];AVC=[];
+  const clear=(x,m)=>!STATIONS.some(s=>Math.abs(s-x)<m)&&!STORIES.some(s=>Math.abs(s.x-x)<m*.6)&&!BREAKS.some(b=>Math.abs(b-x)<400);
+  let d=7000+ur(0,3000);
+  while(d<GOAL-9000){let x=Math.round(d),tries=0;while(!(clear(x,1500)&&clear(x+900,1200))&&tries++<30)x+=350;
+    HILLS.push({x,L:450,A:.03,dir:R()<.5?1:-1});d=x+ur(15000,23000);}
+  d=14000+ur(0,4000);
+  while(d<GOAL-12000){let x=Math.round(d),tries=0;while(!(clear(x,1300)&&clear(x+260,1300)&&!HILLS.some(h=>x>h.x-200&&x<h.x+h.L*2+200))&&tries++<40)x+=300;
+    BRIDGES.push({x0:x,x1:x+240,crack:0});d=x+ur(30000,42000);}
+  d=21000+ur(0,5000);
+  while(d<GOAL-15000){let x=Math.round(d),tries=0;while(!(clear(x,1600)&&!HILLS.some(h=>x>h.x-300&&x<h.x+h.L*2+300)&&!BRIDGES.some(b=>Math.abs(b.x0-x)<900))&&tries++<40)x+=350;
+    AVC.push({x});d=x+ur(36000,54000);}
+}
+/* ---------- bridges ---------- */
+function drawBridges(){
+  for(const b of BRIDGES){
+    const xa=sxw(b.x0),xb=sxw(b.x1);if(xb<WINL-200||xa>WINR+200)continue;
+    const fell=S.swc['b'+b.x0];
+    const step=24;let x=Math.max(Math.floor((WINL-200-xa)/step)*step,0);
+    // frozen river under the deck
+    const yMid=GY+ey(b.x0+120)+70;
+    const g=ctx.createLinearGradient(0,yMid,0,yMid+22);g.addColorStop(0,'rgba(158,196,216,.85)');g.addColorStop(1,'rgba(70,104,128,.85)');
+    ctx.fillStyle=g;ctx.fillRect(xa,yMid,xb-xa,22);
+    ctx.strokeStyle='rgba(235,245,252,.35)';ctx.lineWidth=1;for(let k=0;k<7;k++){const cx=xa+(xb-xa)*(k+.5)/7;ctx.beginPath();ctx.moveTo(cx,yMid+3);ctx.lineTo(cx+9,yMid+11);ctx.lineTo(cx-4,yMid+19);ctx.stroke();}
+    for(let px=xa;px<xb;px+=step){
+      if(px<WINL-60||px>WINR+60)continue;
+      const wx=b.x0+(px-xa)/PX,ty=GY+ey(wx);
+      const cr=(b.crack||0);
+      ctx.fillStyle='#3b2c1d';ctx.fillRect(px,ty+2,step-1,7);
+      ctx.fillStyle='rgba(225,238,247,.85)';ctx.fillRect(px,ty+1,step-1,2.5);
+      if(((px-xa)/step|0)%5===2){ // pylons with cross bracing
+        const dep=yMid+6-(ty+9);
+        ctx.fillStyle='#2b2016';ctx.fillRect(px+8,ty+9,7,dep);
+        ctx.strokeStyle='#2b2016';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(px-18,ty+10);ctx.lineTo(px+30,ty+dep);ctx.moveTo(px+30,ty+10);ctx.lineTo(px-18,ty+dep);ctx.stroke();
+      }
+      if(cr>.3&&hash(px*.37+b.x0)<cr*.5){ctx.fillStyle='#120d08';ctx.fillRect(px+4,ty+2,5,7);}
+    }
+    // warning sign before the bridge
+    const sx=sxw(b.x0-90);if(sx>WINL-40&&sx<WINR+40){
+      const ty=GY+ey(b.x0-90);
+      ctx.strokeStyle='#3a2b1b';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(sx,ty);ctx.lineTo(sx,ty-46);ctx.stroke();
+      ctx.fillStyle='#e8b93a';ctx.beginPath();ctx.moveTo(sx,ty-70);ctx.lineTo(sx+17,ty-40);ctx.lineTo(sx-17,ty-40);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#2a1c08';ctx.fillRect(sx-1.5,ty-62,3,13);ctx.fillRect(sx-1.5,ty-46,3,3);
+      ctx.fillStyle='rgba(225,238,247,.9)';ctx.fillRect(sx-14,ty-74,28,3);
+    }
+  }
+}
+function bridgeTick(dt){
+  extInit();
+  for(const b of BRIDGES){
+    if(S.swc['b'+b.x0]){continue;}
+    if(!S.said['bw'+b.x0]&&S.d>b.x0-650&&S.d<b.x0-80&&S.v>2){S.said['bw'+b.x0]=1;alertSay('جسر خشبي قديم قدامنا. بطّئ… الخشب يئنّ تحتنا.',5600);}
+    const on=S.d>b.x0-15&&S.d<b.x1+25;
+    if(!on){b.crack=Math.max(0,(b.crack||0)-dt*.2);continue;}
+    if(S.v>9)b.crack=(b.crack||0)+(S.v-9)*dt*.05;else b.crack=Math.max(0,(b.crack||0)-dt*.08);
+    if(S.v>2&&(b._cr=(b._cr||0)-dt)<=0){b._cr=rnd(.5,1.2)-Math.min(.4,b.crack*.4);try{burst(260+rnd(0,160),.22,.05+.05*b.crack,5);tone(88+rnd(0,25),.2,.03+.03*b.crack,'sawtooth',70);}catch(e){}}
+    if(b.crack>.45&&!S.said['bc'+b.x0]){S.said['bc'+b.x0]=1;alertSay('الخشب يتشقق! أبطئ فوراً!',3200);}
+    if(b.crack>=1){
+      S.swc['b'+b.x0]='fell';S.hull-=30;S.v=0;S.shake=1;S.flash=.5;S.warm=Math.max(0,S.warm-10);
+      try{burst(120,1.4,.35,.6);tone(55,.9,.25,'sawtooth',32);}catch(e){}
+      if(!BREAKS.includes(Math.round(S.d+12))){BREAKS.push(Math.round(S.d+12));BREAKS.sort((a,c)=>a-c);}
+      S.log.push({t:'الجسر ينهار',r:'عبرتَ الجسر القديم بسرعة. انهار الخشب تحت القطار.',d:Math.round(S.d)});
+      alertSay('انهار جزءٌ من الجسر! الهيكل تضرّر. أصلح السكة أمامك.',5200);
+    }
+  }
+}
+/* ---------- hills: warnings ---------- */
+function hillTick(){
+  for(const h of HILLS){
+    if(S.said['h'+h.x])continue;
+    if(S.d>h.x-650&&S.d<h.x+50&&S.v>2){S.said['h'+h.x]=1;
+      if(h.dir>0)say('طلعة حادة قدامنا. ارفع الضغط وخذ سرعتك الآن. الرمل يساعد العجلات.',5400);
+      else say('نزلة طويلة قدامنا. جهّز المكبح قبل أن تتسارع.',5400);}
+  }
+}
+/* ---------- chasing avalanche ---------- */
+function avTick(dt){
+  extInit();
+  let A=S.avc;
+  if(!A){
+    for(const a of AVC){if(S.swc['a'+a.x])continue;
+      if(S.d>a.x&&S.d<a.x+500&&!S.tut){
+        S.swc['a'+a.x]=1;S.avc=A={x:S.d-220,v:12,t:0,warn:3,hit:false};S.avInit=(S.avInit||0)+1;S.bellT=Math.max(S.bellT||0,4);
+        alertSay('الجرس يرنّ! الجبل ينهار خلفنا! ارفع الضغط وافتح الذراع!',5200);
+        try{[0,.35,.7].forEach(t=>setTimeout(()=>tone(1180,.3,.07,'sine'),t*1000));burst(70,1.6,.25,.5);}catch(e){}
+        break;}
+    }
+    if(S.buryT>0){S.buryT-=dt;if(S.buryT<=0)say('كسر الدفء الثلج المتراكم على آخر عربة، وتساقط عنها.',4200);}
+    return;
+  }
+  A.t+=dt;
+  if(A.warn>0){A.warn-=dt;if((A._r=(A._r||0)-dt)<=0){A._r=.5;try{burst(60,.6,.12,.5);}catch(e){}}return;}
+  A.v=12+Math.min(6.5,(A.t-3)*.22);A.x+=A.v*dt;
+  S.shake=Math.max(S.shake||0,.12);
+  if((A._r=(A._r||0)-dt)<=0){A._r=.4;try{burst(80,.5,.1,.5);}catch(e){}}
+  const gap=S.d-A.x;
+  if(gap<45&&!A.hit){
+    A.hit=true;S.avHit=(S.avHit||0)+1;S.buryT=35;
+    S.hull-=22;S.warm=Math.max(0,S.warm-12);S.coalPile=Math.max(0,S.coalPile-2);S.v*=.35;S.shake=1;S.flash=.6;
+    try{burst(90,1.6,.4,.5);tone(50,.9,.25,'sawtooth',30);}catch(e){}
+    S.log.push({t:'الانهيار الثلجي',r:'لحق بك الجبل وغطّى آخر عربة بالثلج.',d:Math.round(S.d)});
+    alertSay('الانهيار أدركنا! آخر عربة تحت الثلج!',4800);
+  }
+  if(A.t>30||gap>520){if(!A.hit)say('هدأ الجبل خلفك. نجوتَ.',4200);S.avc=null;}
+}
+function drawAvChase(){
+  const A=S.avc;if(!A)return;
+  const sx=sxw(A.x),y=GY+ey(A.x);
+  if(sx<WINL-700||sx>WINR+300)return;
+  ctx.save();
+  const warm=A.warn>0;
+  for(let i=0;i<18;i++){
+    const ox=sx-i*34-Math.sin(S.t*3+i)*8,h=90+hash(i*1.7)*120+Math.sin(S.t*4+i*1.3)*14,r=34+hash(i)*40;
+    const a=(.42-i*.014)*(warm?.5:1);if(a<=0.02)continue;
+    ctx.fillStyle='rgba(232,243,250,'+a+')';circ(ox,y-h*.45,r);ctx.fill();
+    ctx.fillStyle='rgba(200,222,238,'+(a*.8)+')';circ(ox+10,y-h*.9,r*.8);ctx.fill();
+  }
+  const g=ctx.createLinearGradient(sx-600,0,sx+30,0);g.addColorStop(0,'rgba(236,246,252,0)');g.addColorStop(1,'rgba(236,246,252,.55)');
+  ctx.fillStyle=g;ctx.fillRect(sx-600,y-240,630,250);
+  ctx.restore();
+}
+/* ---------- roof chores ---------- */
+function roofTick(dt){
+  extInit();
+  const w=S.storm||0;
+  const inc=(.0007+w*.011)*(S.v>1?1:.5);
+  S.roofSnow=Math.min(1,(S.roofSnow||0)+inc*dt);
+  S.chim=Math.min(1,(S.chim||0)+(.0005+w*.008)*dt);
+  if(S.chim>.05)S.P=Math.max(0,S.P-S.chim*1.4*clamp(S.Tf,0,1)*dt);
+  if(S.chim>.5&&!S.said.chim){S.said.chim=1;say('المدخنة بدأت تنسدّ بالثلج. الضغط يتراجع. اصعد من عربة الفرامل ونظّف السطح.',6200);}
+  if(S.chim<.25)S.said.chim=0;
+  if(S.roofSnow>.6&&!S.said.rsn){S.said.rsn=1;say('الثلج على السطوح ثقيل، والقطار صار أبطأ. نظّف السطح.',5600);}
+  if(S.roofSnow<.3)S.said.rsn=0;
+}
+function roofWork(dt){
+  S.chim=Math.max(0,(S.chim||0)-.11*dt);S.roofSnow=Math.max(0,(S.roofSnow||0)-.11*dt);
+  const w=S.storm||0;
+  if(w>.3){S.warm=Math.max(0,S.warm-w*3*dt);if(!S.said.rwind){S.said.rwind=1;say('الريح على السطح تدفعك! أنهِ عملك بسرعة.',3600);}}else S.said.rwind=0;
+  if(Math.random()<dt*6)S.spray.push({x:TL+rnd(10,170),y:FLOOR-112,vx:rnd(-30,10),vy:rnd(-20,10),a:.9,r:rnd(1.5,3)});
+}
+function drawRoofFx(){
+  ctx.save();ctx.translate(TL,0);
+  // clogged chimney cap
+  const c=S.chim||0;
+  if(c>.08){ctx.fillStyle='rgba(236,246,252,'+Math.min(.95,.35+c)+')';rr(645,FLOOR-157-c*7,11,3+c*7,2);ctx.fill();}
+  // snow buried car
+  if(S.buryT>0){
+    const k=Math.min(1,S.buryT/6)*1;
+    ctx.fillStyle='rgba(230,242,250,'+(.9*k)+')';
+    ctx.beginPath();ctx.moveTo(-6,FLOOR+2);ctx.quadraticCurveTo(50,FLOOR-70,100,FLOOR-80);ctx.quadraticCurveTo(160,FLOOR-70,196,FLOOR+2);ctx.closePath();ctx.fill();
+    ctx.fillStyle='rgba(170,200,220,'+(.5*k)+')';ctx.beginPath();ctx.moveTo(40,FLOOR+2);ctx.quadraticCurveTo(100,FLOOR-40,170,FLOOR+2);ctx.closePath();ctx.fill();
+  }
+  ctx.restore();
+}
+window.__b2=()=>({HILLS,BRIDGES,AVC});
 
 function flames(x,y,w,h,k){
   const n=5;
@@ -4851,7 +5179,7 @@ function drawPlayer(){
     if(p>.15&&p<.9){ctx.fillStyle='#05090e';ctx.beginPath();ctx.moveTo(0,-5);ctx.lineTo(3,-10);ctx.lineTo(7,-8);ctx.lineTo(10,-10);ctx.lineTo(10.5,-5);ctx.fill();}
     ctx.restore();
   }
-  else if(S.work==='search'||S.work==='gsearch'||S.work==='water'||S.work==='leakfix'){
+  else if(S.work==='search'||S.work==='gsearch'||S.work==='water'||S.work==='leakfix'||S.work==='roof'){
     const sg=Math.sin(S.t*8),hx=13+sg*3,hy=-24+Math.abs(sg)*4;
     noodleArm(sx1,sy1,hx,hy,col,2);noodleArm(sx2,sy2,hx-3,hy+3,col,3);
     ctx.strokeStyle='#a8845a';ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(hx,hy);ctx.lineTo(hx+14,hy+9+sg*3);ctx.stroke();
@@ -5025,9 +5353,9 @@ function render(){
   const piv=TL+380;
   ctx.translate(piv,GY);ctx.rotate(S.tilt);ctx.translate(-piv,-GY);
   for(let i=0;i<STATIONS.length;i++)drawStation(i);
-  drawGoal();drawTunnelBack();drawTrack();trainShadow();drawDrifts();drawBreaks();drawBlocks();drawDebris();drawSites();drawCreatures();drawPack();drawWowBack();fogLayer(S.fog,false);
+  drawGoal();drawTunnelBack();drawTrack();drawBridges();trainShadow();drawDrifts();drawBreaks();drawBlocks();drawDebris();drawSites();drawCreatures();drawPack();drawWowBack();fogLayer(S.fog,false);
   ctx.save();ctx.translate(0,Math.sin(S.t*38)*S.bump*1.4);
-  ctx.save();trainScale();drawHeap();drawRearCars();ctx.save();ctx.translate(TL,0);beginPose(locoPose());ctx.translate(-TL,0);drawTrain();drawUpgrades();drawStoke();drawHurTrain();drawCabExtras();drawCabBrake();drawGauges();drawCargo();drawWheelHeat();drawDoorEtc();fireLight();ctx.restore();drawSurvivors();ctx.restore();if(!S.ground){beginPose(playerPoseP());drawPlayer();ctx.restore();}drawShell();ctx.restore();drawCrates();drawLandmarks();drawTowers();drawSwitches();drawStopFronts();drawLadderMark();drawZonesFx();if(S.ground)drawGroundPlayer();drawWowFront();
+  ctx.save();trainScale();drawHeap();drawRearCars();ctx.save();ctx.translate(TL,0);beginPose(locoPose());ctx.translate(-TL,0);drawTrain();drawUpgrades();drawStoke();drawHurTrain();drawCabExtras();drawCabBrake();drawWhistle();drawRoofFx();drawGauges();drawCargo();drawWheelHeat();drawDoorEtc();fireLight();ctx.restore();drawSurvivors();ctx.restore();if(!S.ground){beginPose(playerPoseP());drawPlayer();ctx.restore();}drawShell();ctx.restore();drawCrates();drawLandmarks();drawTowers();drawSwitches();drawStopFronts();drawLadderMark();drawZonesFx();if(S.ground)drawGroundPlayer();drawWowFront();drawAvChase();
   ctx.restore();
   drawTargetMarker();drawPromptTag();
   ctx.restore();
