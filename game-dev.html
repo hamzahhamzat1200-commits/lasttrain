@@ -5372,7 +5372,7 @@ function hudTick(dt){
 function drawOverShell(){
   const k=clamp((.6-ZOOM)/.18,0,1);if(k<.02||S.ground)return;
   ctx.save();beginPose(playerPoseP());
-  ctx.translate(TL+S.px,FLOOR);const s=1+.9*k;ctx.scale(s,s);ctx.translate(-(TL+S.px),-FLOOR);
+  ctx.translate(TL+S.px,FLOOR);const s=1+.15*k;ctx.scale(s,s);ctx.translate(-(TL+S.px),-FLOOR);
   drawPlayer();ctx.restore();
 }
 
