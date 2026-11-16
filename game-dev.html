@@ -128,7 +128,7 @@ canvas{display:block;width:100%;height:100%}
 document.documentElement.dir='rtl';document.documentElement.lang='ar';
 const $=id=>document.getElementById(id);
 const cv=$('c'), ctx=cv.getContext('2d');
-const COARSE=!!(window.matchMedia&&matchMedia('(pointer:coarse)').matches);
+const COARSE=true;
 const KEYW=COARSE?'زر «تفاعل»':'المفتاح E';
 const HOLDW=COARSE?'اضغط مطولاً على «تفاعل»':'اضغط مطولاً على E';
 const MOVEW=COARSE?'بأزرار الأسهم':'بالمفاتيح A و D أو الأسهم';
@@ -615,7 +615,7 @@ function update(dt){
   if(S.modal)return;
   S.t+=dt;
   musicTick(dt);
-  if(!S.ground&&S.v>5&&!S.brkOn){const ns=nextStationAhead();if(ns!==null){const dd=ns-(S.d-TENDER_OFF);if(dd>-10&&dd<230+Math.max(0,S.v-20)*14&&!S.said['st'+ns]){S.said['st'+ns]=1;say('محطة أمامك. اقترب من ذراع المكبح الأحمر واضغط S أو E: يتباطأ القطار تدريجياً. بعدها اسحب الذراع لتتوقف بالضبط عند اللمبة الصفراء.',7000);}}}
+  if(!S.ground&&S.v>5&&!S.brkOn){const ns=nextStationAhead();if(ns!==null){const dd=ns-(S.d-TENDER_OFF);if(dd>-10&&dd<230+Math.max(0,S.v-20)*14&&!S.said['st'+ns]){S.said['st'+ns]=1;say('محطة أمامك. اقترب من ذراع المكبح الأحمر واضغط «تفاعل»: يتباطأ القطار تدريجياً. بعدها اسحب الذراع لتتوقف بالضبط عند اللمبة الصفراء.',7000);}}}
   S.playT+=dt;
   const dirIn=S.clim?0:(inp.right?1:0)-(inp.left?1:0);
   const act=S.clim?false:inp.act,pressed=S.clim?false:inp.pressed;inp.pressed=false;
@@ -650,7 +650,7 @@ function update(dt){
             if(S.crateN<.5){S.carry=false;S.ck='coal';say('أضفتَ الحطب إلى المخزن (+'+Math.round(add)+').',3000);}
             else say('المخزن امتلأ. بقي '+Math.round(S.crateN)+' من الحطب معك.',3200);}
           break;}
-        if(pressed&&!S.carry&&S.coalPile>0){if(!S.said.coalHow){S.said.coalHow=1;say('أخذتَ فحماً. اذهب إلى الفرن (السهم البرتقالي) واضغط E لترميه فتشتد النار.',5200);}S.coalPile--;S.carry=true;S.ck='coal';S.shovelT=.35;burst(520,.1,.12,2);tone(180,.08,.05);}
+        if(pressed&&!S.carry&&S.coalPile>0){if(!S.said.coalHow){S.said.coalHow=1;say('أخذتَ فحماً. اذهب إلى الفرن (السهم البرتقالي) واضغط «تفاعل» لترميه فتشتد النار.',5200);}S.coalPile--;S.carry=true;S.ck='coal';S.shovelT=.35;burst(520,.1,.12,2);tone(180,.08,.05);}
         break;
       case 'item':
         if(pressed&&!S.carry&&!S.itemsTaken[near.idx]){S.itemsTaken[near.idx]=true;S.carry=true;S.ck=ITEMS[near.idx].k;S.shovelT=.35;tone(150,.1,.06,'triangle');}
@@ -704,8 +704,8 @@ function update(dt){
   }
   if(S.ground){if(S.crawl){S.brkOn=false;S.thr=clamp((3-S.v)*.25,0,.5);}else{S.thr=0;S.brkOn=true;}}
   if(inp.dropHit){inp.dropHit=false;dropCrate();}
-  if(inp.doorHit){inp.doorHit=false;if(!S.ground&&!S.clim){if(S.px>520&&S.px<700)toggleDoor();else say('اقترب من الباب عند مقدمة المقصورة ثم اضغط F.',2600);}}
-  if(inp.brkHit){inp.brkHit=false;if(!S.ground){if(S.px>470&&S.px<650)toggleBrake();else say('اقترب من ذراع المكبح الأحمر في المقصورة ثم اضغط S.',2800);}}
+  if(inp.doorHit){inp.doorHit=false;if(!S.ground&&!S.clim){if(S.px>520&&S.px<700)toggleDoor();else say('اقترب من الباب عند مقدمة المقصورة ثم اضغط «تفاعل».',2600);}}
+  if(inp.brkHit){inp.brkHit=false;if(!S.ground){if(S.px>470&&S.px<650)toggleBrake();else say('اقترب من ذراع المكبح الأحمر في المقصورة ثم اضغط «تفاعل».',2800);}}
   S.brkAnim=Math.max(0,S.brkAnim-dt);
   S.brkLv+=((S.brkOn?1:0)-S.brkLv)*(1-Math.exp(-7*dt));
   S.brake+=((S.brkOn?1:0)-S.brake)*(1-Math.exp(-(S.brkOn?1.5:3)*dt));
@@ -741,17 +741,16 @@ function update(dt){
     S.slopeAng=playerPoseP().ang;const sa=S.slopeAng;
     const target=dirIn*vmax*(1+clamp(dirIn*sa*2.5,-.5,.5));
     S.pv+=(target-S.pv)*(1-Math.exp(-8*dt));
-    let f=-S.aS*170+(Math.abs(sa)>.025?sa*380:0);
-    if(!dirIn){const m=Math.max(0,Math.abs(f)-130);f=Math.sign(f)*m;}
-    S.pv+=f*dt*(dirIn?.5:1);
+    /* no inertia push: the player stays where he stands when the train accelerates/brakes/climbs */
+    if(!dirIn)S.pv+=(0-S.pv)*(1-Math.exp(-10*dt));
     S.pv=clamp(S.pv,-vmax*1.5,vmax*1.5);
     if(dirIn)S.face=dirIn;else if(Math.abs(S.pv)>24)S.face=Math.sign(S.pv);
   }
   const px0=S.px;
   if(S.ground){const sp=(work?0:dirIn)*40*warmF*(S.carry?(S.ck==='crate'?.65:.9):1);S.gd=clamp(S.gd+sp*dt,S.d-420,S.d+700);S.pv=sp*PX/TS;if(dirIn&&!work)S.face=dirIn;}
   else S.px=clamp(S.px+S.pv*dt,-585,716);
-  if(!S.ground&&S.doorA>.4&&S.px>430&&S.px<606&&Math.abs(S.v)>3)S.px=Math.max(-585,S.px-S.doorA*Math.abs(S.v)*.5*dt);
-  if(S.doorA<.5&&!S.ground&&!S.clim&&dirIn!==0&&((px0>=602.5&&px0<606&&dirIn>0)||(px0>=606&&px0<=609.5&&dirIn<0))){S._bump=(S._bump||0)+dt;if(S._bump>.25){S._bump=0;S.doorWant=true;S.doorOpen=0;tone(200,.25,.1,'square',120);say('الباب كان مغلقاً فدفعته وفتحته. اضغط F لإغلاقه.',3200);}}else S._bump=0;
+  
+  if(S.doorA<.5&&!S.ground&&!S.clim&&dirIn!==0&&((px0>=602.5&&px0<606&&dirIn>0)||(px0>=606&&px0<=609.5&&dirIn<0))){S._bump=(S._bump||0)+dt;if(S._bump>.25){S._bump=0;S.doorWant=true;S.doorOpen=0;tone(200,.25,.1,'square',120);say('الباب كان مغلقاً فدفعته وفتحته. اضغط «تفاعل» لإغلاقه.',3200);}}else S._bump=0;
   if(S.doorA<.5){if(px0<606)S.px=Math.min(S.px,603);else S.px=Math.max(S.px,609);}
   S.walk+=Math.abs(S.pv)*dt*.075;
 
@@ -938,7 +937,7 @@ function update(dt){
   if(S.d>=GOAL){if(S.endless){endlessLap();}else{S.d=GOAL;end('win');}}
   else if(S.hull<=0){
     S.hull=0;
-    if(!S.broke){S.broke=true;S.thr=0;S.scrap=Math.max(S.scrap,4);say('تعطّل القطار من الضرر. لم تمت: اذهب إلى طاولة الورشة في العربة الأخيرة واضغط E، ثم اختر «ترميم الهيكل».',8000);}
+    if(!S.broke){S.broke=true;S.thr=0;S.scrap=Math.max(S.scrap,4);say('تعطّل القطار من الضرر. لم تمت: اذهب إلى طاولة الورشة في العربة الأخيرة واضغط «تفاعل»، ثم اختر «ترميم الهيكل».',8000);}
   }
   else if(S.warm<=0)end('freeze');
   else{
@@ -4937,6 +4936,8 @@ function d3Bevel(){
   if(!FL('d3'))return;
   const x0=TL-6,w=786,top=GY-215,h=GY+8-top;
   ctx.save();
+  // clip to the real train silhouette (no lighter box in the sky above low cars)
+  ctx.beginPath();ctx.rect(TL,FLOOR-108,190,108+10);ctx.rect(TL+190,FLOOR-60,200,60+10);ctx.rect(TL+390,FLOOR-125,350,125+10);ctx.clip();
   ctx.globalCompositeOperation='soft-light';
   // top lit / bottom shaded: gives the boxes a rounded, solid feel
   let g=ctx.createLinearGradient(0,top,0,top+h);
@@ -4955,8 +4956,8 @@ function d3Bevel(){
   ctx.fillStyle='rgba(215,235,250,.10)';
   for(const e of [0,196,392]){const x=TL+e+4;ctx.beginPath();ctx.moveTo(x,GY-142);ctx.lineTo(x+180,GY-142);ctx.lineTo(x+170,GY-150);ctx.lineTo(x+12,GY-150);ctx.closePath();ctx.fill();}
   // contact shadow under the chassis
-  let g3=ctx.createLinearGradient(0,GY-26,0,GY+6);g3.addColorStop(0,'rgba(0,0,8,0)');g3.addColorStop(1,'rgba(0,0,8,.35)');
-  ctx.fillStyle=g3;ctx.fillRect(x0,GY-26,w,32);
+  ctx.save();ctx.translate(x0+w/2,GY-4);ctx.scale(1,.06);let g3=ctx.createRadialGradient(0,0,0,0,0,w/2);g3.addColorStop(0,'rgba(0,0,8,.4)');g3.addColorStop(.75,'rgba(0,0,8,.25)');g3.addColorStop(1,'rgba(0,0,8,0)');
+  ctx.fillStyle=g3;ctx.fillRect(-w/2,-w/2,w,w);ctx.restore();
   ctx.restore();
 }
 function d3Front(){
@@ -5175,7 +5176,7 @@ function tipTick(dt){
   try{if(FL('av')){const av=AVC.find(q=>q.x>S.d&&q.x-S.d<2600);if(av)tip('av','صوت تشقّق في الجبل: انهيار ثلجي قادم من الخلف. حافظ على سرعتك العالية ولا تتوقف حتى يمرّ.');}}catch(e){}
   if((S.chim||0)>.35||(S.roofSnow||0)>.4)tip('roof','السقف يحتاج عناية: مدخنة مسدودة أو ثلج ثقيل. اصعد بالسلّم عند العربة الأولى (علامة السقف) وامسح الثلج بالضغط المستمر.');
   if(S.v>3)tip('whistle','حبل الصفّارة بجانب المقصورة. اسحبه ليخيف الذئاب وليرد عليك المختبئون في الضباب.');
-  if(FL('timectl')&&S.d>2500&&S.v>8)tip('ts','الزر الدائري في وسط الشاشة (أو مفتاح T) يغيّر سرعة الزمن: ×٢ و×٣ للتسريع في الطريق الخالي، و½ لإبطاء اللحظات الحرجة (يستهلك تركيزك). يعود الزمن طبيعياً قرب المحطات والأخطار.');
+  if(FL('timectl')&&S.d>2500&&S.v>8)tip('ts','الزر البرتقالي أعلى اليمين يغيّر سرعة الزمن: ×٢ و×٣ للتسريع في الطريق الخالي، و½ لإبطاء اللحظات الحرجة (يستهلك تركيزك). يعود الزمن طبيعياً قرب المحطات والأخطار.');
   if(S.oj&&S.oj.on&&S.v<4.5)tip('oj','اقفز من مقدمة القطار (علامة النزول) والقطار يزحف، ثم امشِ إلى منتصفه واضغط مطوّلاً على العجلة لتكسير الجليد. ارجع إلى السلّم قبل أن يبتعد القطار.');
   if(S.d>20000)tip('journal','افتح دفتر الرحلة (J) كل فترة: فيه الخريطة والألبوم والإنجازات والأشرطة.');
 }
@@ -5254,7 +5255,10 @@ function tsCycle(){
     const b=document.createElement('button');b.id='tsBtn';b.type='button';b.textContent='×١';
     b.style.cssText='position:absolute;top:10px;right:12px;width:62px;height:62px;border-radius:50%;border:3px solid #ffb04a;background:radial-gradient(circle at 35% 30%,#ffd28a,#e8791c);color:#2a1503;font:900 24px system-ui,sans-serif;z-index:8;touch-action:manipulation;direction:ltr;box-shadow:0 0 14px rgba(255,150,40,.5);animation:tsPulse 2.2s infinite;display:none';
     b.addEventListener('click',tsCycle);t.appendChild(b);
-    window.__tsShow=on=>{b.style.display=on?'block':'none';};
+    const pz=document.createElement('button');pz.id='pauseBig';pz.type='button';pz.setAttribute('aria-label','إيقاف مؤقت');pz.innerHTML='<span style="display:inline-block;width:8px;height:24px;background:#eaf4fb;border-radius:2px;margin:0 3px"></span><span style="display:inline-block;width:8px;height:24px;background:#eaf4fb;border-radius:2px;margin:0 3px"></span>';
+    pz.style.cssText='position:absolute;top:10px;right:84px;width:62px;height:62px;border-radius:50%;border:3px solid #8fb4cc;background:radial-gradient(circle at 35% 30%,#4a6a82,#16283a);z-index:8;touch-action:manipulation;display:none;align-items:center;justify-content:center;box-shadow:0 0 14px rgba(120,170,210,.45);padding:0;';
+    pz.addEventListener('click',()=>{try{openPause();}catch(e){}});t.appendChild(pz);
+    window.__tsShow=on=>{b.style.display=on?'block':'none';pz.style.display=on?'flex':'none';};
     window.addEventListener('keydown',e=>{if(e.key==='t'||e.key==='T')tsCycle();});
   }catch(e){}
 })();
