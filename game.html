@@ -5299,6 +5299,51 @@ function samplesTick(){
 }
 window.__b5={playSamp,sampGet,SB,LOOPS};
 
+/* ====== random roadside set pieces (uses the real model renders + procedural props) ====== */
+const SETP=[
+ {n:'poles',w:700},{n:'works',w:380},{n:'rubble',w:300},{n:'yard',w:340},{n:'hydrants',w:260},{n:'crane',w:200},{n:'wreck',w:360},{n:'trees',w:520}
+];
+function setAt(i){
+  const h=hash(i*13.7+(S.seed||7)*.31);
+  if(h<.38)return null;
+  const k=SETP[Math.floor(hash(i*3.1+5)*SETP.length)];
+  return {i,k,x:i*1100+hash(i*9.3)*500+300};
+}
+function deadTree(x,y,h,col){
+  ctx.save();ctx.strokeStyle=col;ctx.lineWidth=Math.max(1.5,h*.035);ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+h*.02,y-h*.55);ctx.stroke();
+  for(let b=0;b<5;b++){const by=y-h*(.25+b*.14),dir=b%2?1:-1,l=h*(.34-b*.04);ctx.lineWidth=Math.max(1,h*.02);ctx.beginPath();ctx.moveTo(x+h*.01,by);ctx.lineTo(x+dir*l,by-l*.6);ctx.stroke();}
+  ctx.restore();
+}
+function drawSetPiece(sp,near){
+  const wx=sp.x,sx=sxw(wx),y=GY+44;
+  if(STATIONS.some(s=>Math.abs(s-wx)<900))return;
+  const dk=hash(sp.i*2.9);
+  switch(sp.k.n){
+    case 'poles':{ // line of electricity poles with a sagging wire
+      for(let j=0;j<5;j++){const px=sxw(wx+j*95),py=GY+34+Math.sin(j*1.3+sp.i)*3;
+        spr('pole',px,py,300+hash(sp.i+j)*30,{dark:1,noshadow:1,a:.95});
+        if(j<4){const qx=sxw(wx+(j+1)*95);ctx.save();ctx.strokeStyle='rgba(8,14,22,.8)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(px,py-262);ctx.quadraticCurveTo((px+qx)/2,py-262+28,qx,py-262);ctx.stroke();ctx.restore();}}
+      break;}
+    case 'works':spr('barrier',sx,y+6,34);spr('barrier2',sx+70,y+8,34,{flip:1});spr('torch',sx+30,y+2,34);spr('chest',sx+120,y+10,30);spr('ladder',sx-60,y+4,64);break;
+    case 'rubble':spr('boulder',sx,y+10,60);spr('boulder',sx+60,y+14,38,{flip:1});spr('branches',sx-48,y+8,26);spr('branches',sx+105,y+12,22,{flip:1});break;
+    case 'yard':spr('aircon',sx,y+8,60);spr('plant',sx+66,y+8,52);spr('door',sx-60,y+6,78);spr('gate',sx+130,y+4,70);break;
+    case 'hydrants':for(let j=0;j<4;j++)spr('hydrant',sx+j*58,y+6+j%2*6,44+j%2*6,{flip:j%2});break;
+    case 'crane':{ctx.save();ctx.globalAlpha=.7;spr('crane',sx,GY+30,210,{dark:1,noshadow:1});ctx.restore();break;}
+    case 'wreck':{ // a rusted hull half buried in snow
+      ctx.save();ctx.translate(sx,y+8);ctx.fillStyle='#16212d';ctx.beginPath();ctx.moveTo(-90,0);ctx.lineTo(-84,-34);ctx.lineTo(-30,-50);ctx.lineTo(30,-52);ctx.lineTo(84,-30);ctx.lineTo(96,0);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#0a1118';for(let w=0;w<4;w++)ctx.fillRect(-72+w*38,-40,22,13);
+      ctx.fillStyle='rgba(200,225,245,.55)';ctx.beginPath();ctx.moveTo(-96,2);ctx.quadraticCurveTo(0,-22,100,2);ctx.closePath();ctx.fill();ctx.restore();break;}
+    case 'trees':for(let j=0;j<5;j++){deadTree(sxw(wx+j*55+hash(sp.i+j)*30),GY+26+(j%3)*14,70+hash(sp.i*2+j)*60,'rgba(10,18,28,'+(.85-.1*(j%3))+')');}break;
+  }
+}
+function drawRoadside(){
+  if(!FL('scenery'))return;
+  const w1=S.d+(WINL-FS)/PX-700,w2=S.d+(WINR-FS)/PX+300;
+  for(let i=Math.floor(w1/1100);i<=Math.ceil(w2/1100);i++){const sp=setAt(i);if(!sp)continue;try{drawSetPiece(sp);}catch(e){}}
+}
+window.__b6={setAt,SETP};
+
 function flames(x,y,w,h,k){
   const n=5;
   for(let i=0;i<n;i++){
@@ -5735,7 +5780,7 @@ function render(){
   ctx.restore();
   drawTargetMarker();drawPromptTag();
   ctx.restore();
-  ctx.save();trainScale();drawFx();ctx.restore();drawNearDepth();d3Front();drawFg();drawSnow();fogLayer(S.fog,true);
+  ctx.save();trainScale();drawFx();ctx.restore();drawNearDepth();drawRoadside();d3Front();drawFg();drawSnow();fogLayer(S.fog,true);
   todOverlay();gradePass();bloomPass(_frameDt);overlays();
 }
 
