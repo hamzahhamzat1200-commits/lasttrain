@@ -1369,8 +1369,19 @@ function drawPhoto(x,y,w,h){
   ctx.fillStyle='rgba(220,238,248,.75)';ctx.beginPath();ctx.moveTo(w,h);ctx.lineTo(w-18,h);ctx.lineTo(w,h-14);ctx.fill();
   ctx.restore();
 }
+function roomLight(ix,iy,iw,ih,seed){
+  const cxm=ix+iw/2,fl=.94+.06*Math.sin(S.t*7+seed)+.03*Math.sin(S.t*17.3+seed*2);
+  ctx.save();ctx.beginPath();ctx.rect(ix,iy,iw,ih);ctx.clip();
+  ctx.globalCompositeOperation='lighter';
+  const g=ctx.createRadialGradient(cxm,iy+14,4,cxm,iy+ih*.35,iw*.8);
+  g.addColorStop(0,'rgba(255,190,110,'+(.46*fl)+')');g.addColorStop(.5,'rgba(255,150,70,'+(.24*fl)+')');g.addColorStop(1,'rgba(255,120,50,.12)');
+  ctx.fillStyle=g;ctx.fillRect(ix,iy,iw,ih);
+  ctx.fillStyle='rgba(255,175,105,.10)';ctx.fillRect(ix,iy,iw,ih);
+  ctx.restore();
+}
 function carShell(x0,w,seed,top,bot){
   interior(x0+6,FLOOR-97,w-12,97,top,bot,true);
+  roomLight(x0+6,FLOOR-97,w-12,97,x0);
   ctx.fillStyle='#2b4156';ctx.fillRect(x0,FLOOR-106,7,106);ctx.fillRect(x0+w-6,FLOOR-106,6,106);
   roof(x0,x0+w,seed,FLOOR-106);
   ctx.fillStyle='#0f1c2a';ctx.fillRect(x0,FLOOR,w,9);
@@ -3830,7 +3841,7 @@ const GFXP=[
  {css:'',g0:'rgba(30,70,130,.08)',g1:'rgba(40,20,10,.12)',vig:0,grain:0,bloom:.3},
  {css:'saturate(1.15) contrast(1.12) brightness(.97)',g0:'rgba(0,130,170,.30)',g1:'rgba(255,110,30,.22)',vig:.4,grain:.06,bloom:.55},
  {css:'saturate(.65) contrast(.95) brightness(1.14) sepia(.18)',g0:'rgba(255,175,115,.26)',g1:'rgba(120,150,195,.22)',vig:.18,grain:.035,bloom:.5},
- {css:'saturate(.85) contrast(1.35) brightness(.74)',g0:'rgba(0,0,12,.35)',g1:'rgba(140,25,10,.22)',vig:.8,grain:.07,bloom:.4},
+ {css:'saturate(.9) contrast(1.15) brightness(1.02)',g0:'rgba(0,0,12,.18)',g1:'rgba(140,25,10,.12)',vig:.42,grain:.05,bloom:.4},
  {css:'saturate(.7) contrast(1.1) brightness(1.2)',g0:'rgba(205,225,245,.28)',g1:'rgba(255,255,255,.12)',vig:.22,grain:.04,bloom:.22}
 ];
 window.__gfx=0;let _gfxApplied=-1,_grain=null;
@@ -4302,7 +4313,7 @@ function todOverlay(){
   const t=todState();
   ctx.save();ctx.setTransform(DPR,0,0,DPR,0,0);
   const n=1-t.day;
-  if(n>.01){ctx.fillStyle='rgba(2,5,14,'+(.2*n)+')';ctx.fillRect(0,0,CW,CH);}
+  if(n>.01){ctx.fillStyle='rgba(2,5,14,'+(.12*n)+')';ctx.fillRect(0,0,CW,CH);}
   if(t.day>.01){ctx.globalCompositeOperation='screen';ctx.fillStyle='rgba(120,150,180,'+(.12*t.day)+')';ctx.fillRect(0,0,CW,CH);ctx.globalCompositeOperation='source-over';}
   ctx.restore();
 }
@@ -4392,6 +4403,7 @@ function drawTrain(){
 
   /* brake car */
   interior(6,FLOOR-97,178,97,'#0b1621','#142536',true);
+  roomLight(6,FLOOR-97,178,97,3);
   ctx.save();ctx.globalCompositeOperation='lighter';glow(95,FLOOR-66,125,'255,170,90',.04+.12*heat);ctx.restore();
   ctx.fillStyle='#2b4156';ctx.fillRect(0,FLOOR-106,7,106);ctx.fillRect(184,FLOOR-106,6,50);
   roof(0,190,11,FLOOR-106);
@@ -4424,6 +4436,7 @@ function drawTrain(){
 
   /* cab */
   interior(396,FLOOR-105,200,105,'#0b1520','#16293b',true);
+  roomLight(396,FLOOR-105,200,105,9);
   ctx.save();ctx.globalCompositeOperation='lighter';
   glow(432,FLOOR-30,170,'255,138,61',.05+.34*heat);
   glow(520,FLOOR-60,120,'255,150,70',.02+.12*heat);
