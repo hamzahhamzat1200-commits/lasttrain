@@ -4331,6 +4331,7 @@ addEventListener('keydown',e=>{if(e.code==='KeyJ'&&mode==='play'&&S&&!S.over&&!S
 /* ---------- master tick ---------- */
 function extUpdate(dt){
   extInit();
+  if(S.modal)return;
   todTick();packTick(dt);survTick(dt);tapeTick(dt);
   for(const sw of SWITCHES){if(S.swc[sw.x])continue;
     if(S.d>sw.x){S.swc[sw.x]='long';applySwitchWorld(sw.x,'long');continue;}
