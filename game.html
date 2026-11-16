@@ -1370,6 +1370,7 @@ function drawPhoto(x,y,w,h){
   ctx.restore();
 }
 function roomLight(ix,iy,iw,ih,seed){
+  if(!window.__lamp)return;
   const cxm=ix+iw/2,fl=.94+.06*Math.sin(S.t*7+seed)+.03*Math.sin(S.t*17.3+seed*2);
   ctx.save();ctx.beginPath();ctx.rect(ix,iy,iw,ih);ctx.clip();
   ctx.globalCompositeOperation='lighter';
@@ -4025,7 +4026,7 @@ function drawSmoke(){
     const d=p.r*2.7;ctx.drawImage(im,-d/2,-d/2,d,d);ctx.restore();
   }
 }
-window.__gfx=3;
+window.__gfx=0;
 
 /* ===== v24: ported extension pack: survivors, track switches, night wolves, tapes, water towers, landmarks, day/night, journal ===== */
 (function(){
