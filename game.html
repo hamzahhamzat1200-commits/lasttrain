@@ -4860,10 +4860,10 @@ function frame(ts){
   requestAnimationFrame(frame);
   const dt=Math.min(.05,(ts-last)/1000||0);last=ts;_frameDt=dt;
   try{
-    if(mode==='play')update(dt);else idle(dt);
-    fx(dt);camera(dt,false);
+    const _a=performance.now();if(mode==='play')update(dt);else idle(dt);
+    fx(dt);camera(dt,false);window.__tu=performance.now()-_a;
   }catch(e){window.__err=e;console.error(e);}
-  try{render();}catch(e){window.__err=e;console.error(e);try{for(let i=0;i<40;i++)ctx.restore();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';}catch(_){}}
+  try{const _b=performance.now();render();window.__tr=performance.now()-_b;}catch(e){window.__err=e;console.error(e);try{for(let i=0;i<40;i++)ctx.restore();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';}catch(_){}}
   try{domUpdate();audioTick();}catch(e){window.__err=e;}
 }
 fit();camera(0,true);
