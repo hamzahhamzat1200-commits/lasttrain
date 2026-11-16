@@ -198,6 +198,13 @@ jobs:
           }
           EOT
 
+      - name: Add launcher icon
+        run: |
+          mkdir -p P/app/src/main/res
+          cp -r src/store/res/* P/app/src/main/res/
+          sed -i 's/android:label="آخر قطار"/android:label="آخر قطار" android:icon="@mipmap\/ic_launcher"/' P/app/src/main/AndroidManifest.xml
+          grep -c ic_launcher P/app/src/main/AndroidManifest.xml
+
       - name: Build APK
         run: |
           cd P
@@ -215,6 +222,36 @@ jobs:
             cp P/app/build/outputs/apk/debug/app-debug.apk LastTrain-Dev.apk
           fi
 
+      - name: Build signed AAB for Google Play
+        env:
+          KS_B64: ${{ secrets.UPLOAD_KS_B64 }}
+          KS_PW: ${{ secrets.UPLOAD_KS_PW }}
+        run: |
+          if [ -z "$KS_B64" ]; then echo "No signing secrets - skipping AAB"; exit 0; fi
+          SDK="$ANDROID_HOME"
+          SM="$SDK/cmdline-tools/latest/bin/sdkmanager"; test -x "$SM" || SM="$(command -v sdkmanager)"
+          "$SM" "platforms;android-36" "build-tools;35.0.0" || true
+          curl -fsSL --retry 5 -o gradle2.zip https://services.gradle.org/distributions/gradle-8.11.1-bin.zip
+          unzip -q gradle2.zip
+          rm -rf P2 && mkdir P2 && cp -r P/app P/settings.gradle P/gradle.properties P/local.properties P2/
+          rm -rf P2/app/build
+          cp src/game.html P2/app/src/main/assets/index.html
+          sed -i "s/applicationId 'com.lasttrain.dev'/applicationId 'com.lasttrain.game'/" P2/app/build.gradle
+          sed -i 's/android:label="آخر قطار DEV"/android:label="آخر قطار"/' P2/app/src/main/AndroidManifest.xml
+          echo "$KS_B64" | base64 -d > P2/upload.jks
+          cd P2
+          echo "plugins { id 'com.android.application' version '8.9.1' apply false }" > build.gradle
+          sed -i "s/compileSdk 34/compileSdk 36/; s/targetSdk 34/targetSdk 36/; s/versionCode 1/versionCode ${GITHUB_RUN_NUMBER}/" app/build.gradle
+          cat >> app/build.gradle <<EOT
+          android {
+              signingConfigs { release { storeFile file('../upload.jks'); storePassword System.getenv('KS_PW'); keyAlias 'upload'; keyPassword System.getenv('KS_PW') } }
+              buildTypes { release { signingConfig signingConfigs.release } }
+          }
+          EOT
+          ../gradle-8.11.1/bin/gradle bundleRelease --no-daemon --stacktrace
+          cp app/build/outputs/bundle/release/app-release.aab ../LastTrain.aab
+          ls -l ../LastTrain.aab
+
       - name: Publish APK as a release
         run: |
-          gh release create "apk-${GITHUB_RUN_NUMBER}" LastTrain.apk $(test -s LastTrain-Dev.apk && echo LastTrain-Dev.apk) --repo "$GITHUB_REPOSITORY" --title "LastTrain APK #${GITHUB_RUN_NUMBER}" --notes "Download LastTrain.apk and install it on your phone."
+          gh release create "apk-${GITHUB_RUN_NUMBER}" LastTrain.apk $(test -s LastTrain-Dev.apk && echo LastTrain-Dev.apk) $(test -s LastTrain.aab && echo LastTrain.aab) --repo "$GITHUB_REPOSITORY" --title "LastTrain APK #${GITHUB_RUN_NUMBER}" --notes "Download LastTrain.apk and install it on your phone."
