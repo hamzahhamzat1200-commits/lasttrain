@@ -297,6 +297,7 @@ function genWorld(seed){
   STATIONS.sort((a,b)=>a-b);BREAKS.sort((a,b)=>a-b);DRIFTS.sort((a,b)=>a[0]-b[0]);STORIES.sort((a,b)=>a.x-b.x);WRECKS.sort((a,b)=>a.x-b.x);
   buildElev();
   if(typeof genZones==='function')genZones();
+  if(typeof extGen==='function')extGen(seed);
 }
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -477,7 +478,7 @@ function promptFor(t){
     case 'gsearch':return {l:'فتّش الحطام',hold:1};
     case 'gstory':return {l:'استكشف'};
     case 'door':return {l:S.doorWant?'أغلق الباب':'افتح الباب'};
-    case 'water':return S.W>=99.5?{l:'المرجل ممتلئ',dead:true}:{l:'ذوّب ثلجاً',hold:1};
+    case 'water':return S.W>=99.5?{l:'المرجل ممتلئ',dead:true}:{l:atTower()?'اسحب سلسلة برج الماء':'ذوّب ثلجاً',hold:1};
     case 'lever':return {l:S.work==='lever'?'حرّك يميناً أو يساراً':'ذراع الدفع',hold:1};
     case 'brake':return {l:S.brkOn?'حرّر المكبح':'اسحب المكبح'};
     case 'pipe':return S.leak?{l:'سدّ التسريب',hold:1}:null;
@@ -502,7 +503,7 @@ const SAVE_KEY='lasttrain.v3';
 function saveGame(){
   try{
     if(!S||S.over||S.tut)return;
-    const o={seed:S.seed,d:S.d,hull:S.hull,coalPile:S.coalPile,scrap:S.scrap,upg:S.upg,flags:S.flags,fixed:S.fixed,cleared:S.cleared,looted:S.looted,told:S.told,done:S.done,itemsTaken:S.itemsTaken,cargo:S.cargo,crateN:S.crateN,crateTaken:S.crateTaken,loadN:S.loadN,W:S.W,playT:S.playT,fuel:S.fuel};
+    const o={seed:S.seed,d:S.d,hull:S.hull,coalPile:S.coalPile,scrap:S.scrap,upg:S.upg,flags:S.flags,fixed:S.fixed,cleared:S.cleared,looted:S.looted,told:S.told,done:S.done,itemsTaken:S.itemsTaken,cargo:S.cargo,crateN:S.crateN,crateTaken:S.crateTaken,loadN:S.loadN,W:S.W,playT:S.playT,fuel:S.fuel,surv:S.surv,tapes:S.tapes,log:S.log,swc:S.swc,survCold:S.survCold};
     localStorage.setItem(SAVE_KEY,JSON.stringify(o));
   }catch(e){}
 }
@@ -511,7 +512,7 @@ function clearSave(){try{localStorage.removeItem(SAVE_KEY);}catch(e){}}
 function restoreFrom(o){
   genWorld(o.seed);
   S=newState(true,o.seed);
-  Object.assign(S,{d:Math.max(0,o.d-30),hull:o.hull,coalPile:o.coalPile,scrap:o.scrap,upg:o.upg||{},flags:o.flags||{},fixed:o.fixed||{},cleared:o.cleared||{},looted:o.looted||{},told:o.told||{},done:o.done||{},itemsTaken:o.itemsTaken||{},cargo:o.cargo||[],crateN:o.crateN||0,crateTaken:o.crateTaken||{},loadN:o.loadN||{},W:Math.max(60,o.W||80),playT:o.playT||0,fuel:Math.max(2.5,o.fuel||0),P:60,Tf:.5,warm:100});
+  Object.assign(S,{d:Math.max(0,o.d-30),hull:o.hull,coalPile:o.coalPile,scrap:o.scrap,upg:o.upg||{},flags:o.flags||{},fixed:o.fixed||{},cleared:o.cleared||{},looted:o.looted||{},told:o.told||{},done:o.done||{},itemsTaken:o.itemsTaken||{},cargo:o.cargo||[],crateN:o.crateN||0,crateTaken:o.crateTaken||{},loadN:o.loadN||{},W:Math.max(60,o.W||80),playT:o.playT||0,fuel:Math.max(2.5,o.fuel||0),P:60,Tf:.5,warm:100,surv:o.surv||[],tapes:o.tapes||[],log:o.log||[],swc:o.swc||{},survCold:o.survCold||0,_ext:1,todSaid:-1,pack:null,groundT:0,tapePlay:null});
 }
 
 
@@ -708,13 +709,13 @@ function update(dt){
       tone(170,.12,.09,'triangle');burst(500,.15,.1,1.4);loadFx();
       if(S.loadN[st]>=6){const si=stationIndex(st);S.scrap+=3+((si*5)%4);S.looted[st]=true;tone(440,.25,.09);say('اكتمل التحميل، وجمعتَ بعض القطع.',3200);saveGame();}}
   }else S.load=Math.max(0,S.load-dt*2);
-  if(work==='water'){S.W=Math.min(100,S.W+9*clamp(.25+S.Tf*1.5,.25,1)*dt);S.Tf*=Math.exp(-.04*dt);if(Math.random()<.15)burst(2600,.08,.05,2);}
+  if(work==='water'){const _tw=atTower();S.W=Math.min(100,S.W+(_tw?45:9*clamp(.25+S.Tf*1.5,.25,1))*dt);if(_tw&&Math.random()<.4)S.spray.push({x:TL+503+rnd(-4,4),y:FLOOR-150,vx:rnd(-20,20),vy:rnd(20,80),a:.9,r:rnd(1.5,3)});S.Tf*=Math.exp(-.04*dt);if(Math.random()<.15)burst(2600,.08,.05,2);}
   if(work==='leakfix'){S.leakFix+=dt;if(Math.random()<.3)burst(1800,.05,.08,3);if(S.leakFix>=3){S.leak=false;S.leakFix=0;tone(520,.25,.09);say('سددتَ التسريب.',2600);}}
   else S.leakFix=Math.max(0,S.leakFix-dt);
   const wsite=work==='gsearch'?near.site:site;
   if((work==='search'||work==='gsearch')&&wsite&&wsite.type==='wreck'){const site=wsite;S.loot+=dt;
     if(Math.random()<.2)burst(900,.05,.07,2);
-    if(S.loot>=2.6){S.scrap+=site.w.loot;S.done['w'+site.i]=true;S.loot=0;tone(600,.2,.08);say('وجدتَ '+site.w.loot+' قطع في الحطام.',3000);}
+    if(S.loot>=2.6){S.scrap+=site.w.loot;S.done['w'+site.i]=true;S.loot=0;try{extWreck(site.i);}catch(e){}tone(600,.2,.08);say('وجدتَ '+site.w.loot+' قطع في الحطام.',3000);}
   }else S.loot=Math.max(0,S.loot-dt*2);
 
   /* player body */
@@ -744,7 +745,7 @@ function update(dt){
   const draft=clamp(.35+.035*av+.5*ta,.35,1.3);
   const tgt=clamp(S.fuel/3.5,0,1)*Math.min(1,.55+.5*draft);
   S.Tf+=(tgt-S.Tf)*(1-Math.exp(-dt/2.5));
-  S.fuel=Math.max(0,S.fuel-(.008+.056*S.Tf*draft)*dt*(1+.1*L('heat'))*DF().burn*.37*[1,.92,.85][L('boiler')]);
+  S.fuel=Math.max(0,S.fuel-(.008+.056*S.Tf*draft)*dt*(1+.1*L('heat'))*DF().burn*.37*survBurn()*[1,.92,.85][L('boiler')]);
   if(L('stoker')>0){
     S.stokerT-=dt;const th=L('stoker')>1?2.4:1.3;
     if(S.stokerT<=0&&S.fuel<th&&S.coalPile>0){S.coalPile--;S.fuel=Math.min(12,S.fuel+1);S.throws++;S.doorOpen=.55;S.smoke=1.6;S.stokerT=L('stoker')>1?3:6;burst(900,.2,.1,1.5);tone(120,.12,.06);}
@@ -863,7 +864,7 @@ function update(dt){
   const sn=S.snap>0?1.7:1;
   const ins=1-.18*L('insul')-(S.flags.plant?.04:0);
   const coldFront=(.85+.04*av+1.6*S.storm+1.1*S.ice+1.5*S.deep+2.5*hurStr())*(L('heat')>=3?.8:1),coldCab=(.55+.02*av+.45*S.storm+.35*S.ice+.5*S.deep+3.0*hurStr())*(1-.15*L('xchg'));
-  const cold=lerp(coldFront,coldCab,shelter)*ins*sn*DF().cold;
+  const cold=lerp(coldFront,coldCab,shelter)*ins*sn*DF().cold*todCold()*(S.ground&&S.surv&&S.surv.some(q=>q.k==='doc')?.92:1);
   S.warm=clamp(S.warm+(gain-cold)*dt,0,100);
 
   /* frost, hail */
@@ -914,7 +915,7 @@ function update(dt){
     if(S.coalPile>4)S.said.low=0;
     if(nb2!==null&&dist<bellR-10&&dist>bellR-60&&!S.said['b'+nb2]){S.said['b'+nb2]=1;say('الجرس يرنّ: سكة مقطوعة أمامنا.',4200);}
   }
-  tutorialTick(dt);alertsTick(dt);hurTick(dt);zTick(dt);evTick(dt);
+  tutorialTick(dt);alertsTick(dt);hurTick(dt);zTick(dt);evTick(dt);extUpdate(dt);if(S.modal)return;
   charStep(dt,dirIn);
 
   /* end conditions */
@@ -1002,8 +1003,9 @@ function applyRes(r){
   if(r.warm){S.warm=clamp(S.warm+r.warm,0,100);bits.push('دفء');}
   if(r.hull){S.hull=clamp(S.hull+r.hull,0,100);}
   if(r.flag){S.flags[r.flag]=1;}
+  let _ex='';try{_ex=extRes(r);}catch(e){}
   if(stCur&&stCur.def.id==='lighthouse'&&r.coal)S._lit=1;
-  S._res=t+(bits.length?'  ('+bits.join('، ')+')':'');
+  S._res=(_ex[0]==='|'?_ex.slice(1):t+_ex)+(bits.length?'  ('+bits.join('، ')+')':'');
   tone(520,.25,.08);
 }
 /* ---------- screens ---------- */
@@ -2469,10 +2471,12 @@ function renderPause(){
   const dir=CFG.lang==='en'?'ltr':'rtl';
   showOv('<div class="pn" dir="'+dir+'" style="max-width:420px"><div class="ph"><h2>'+T('إيقاف مؤقت')+'</h2></div><div class="pf" style="flex-direction:column;gap:10px">'+
     '<button type="button" class="btn" id="pResume">'+T('تابع اللعب')+'</button>'+
+    '<button type="button" class="btn alt" id="pLog">'+T('دفتر الرحلة')+'</button>'+
     '<button type="button" class="btn alt" id="pSet">'+T('الإعدادات')+'</button>'+
     '<button type="button" class="btn alt" id="pQuit">'+T('احفظ واخرج إلى القائمة')+'</button></div></div>');
   $('pResume').addEventListener('click',resumeGame);
   $('pSet').addEventListener('click',()=>openSettings(renderPause));
+  $('pLog').addEventListener('click',()=>openJournal());
   $('pQuit').addEventListener('click',()=>{try{saveGame();}catch(e){}location.reload();});
 }
 function openPause(){
@@ -3629,6 +3633,7 @@ function startOutro(){
     if(greed)OUTRO.push('الفحم الذي جمعتُه كان وافراً… أكثر مما يحتاجه من تبقّى. أدركتُ أن جزءاً منه كان يخصّ غيري.');
     OUTRO.push('جلستُ بجانب النار. لم أتكلم. وفي الليل سمعتُ في الأفق صافرة قطار آخر… ربما هو الصدى.');
   }
+  try{const ex=extOutroLines();if(ex.length)OUTRO.splice(OUTRO.length-1,0,...ex);}catch(e){}
   outI=0;renderOutro();
 }
 
@@ -4011,6 +4016,331 @@ function drawSmoke(){
 }
 window.__gfx=3;
 
+/* ===== v24: ported extension pack: survivors, track switches, night wolves, tapes, water towers, landmarks, day/night, journal ===== */
+(function(){
+  const NEW=[ {id:'depot',title:'الورشة المضاءة',prop:{k:'house',lit:1,chimney:1},
+  lines:['مستودع صيانة قديم، ومن تحت بابه يتسرّب ضوء برتقالي ضعيف.','في الداخل رجل يلفّ يديه حول نار صغيرة من الخشب المكسور. حين رآك وقف وقال: «اسمي يوسف. كنت ميكانيكي هذا الخط.»'],
+  q:'ينظر إلى قطارك طويلاً، ثم إليك.',
+  a:{t:'خذه معك',res:{surv:'mech',text:'حمل صندوق عدّته وصعد دون كلمة.'}},
+  b:{t:'أعطه فحماً وامضِ',res:{coal:-6,warm:30,text:'شكرك وأغلق الباب. ستبقى ناره مشتعلة الليلة على الأقل.'}}},
+ {id:'wtgirl',title:'الفتاة عند برج الماء',prop:{k:'wtower'},
+  lines:['تحت برج ماء متجمّد فتاة تحاول إذابة الجليد عن الصنبور بولّاعة صغيرة.','قالت دون أن تلتفت: «أنا ليان. أعرف كيف أذوّب الثلج بأقل نار. علّمني أبي.»'],
+  q:'الولّاعة تكاد تنطفئ.',
+  a:{t:'ادعُها إلى القطار',res:{surv:'water',text:'قفزت إلى العربة الوسطى ونفخت في يديها تضحك.'}},
+  b:{t:'أعطها قفازيك',res:{warm:-20,scrap:3,text:'أعطتك بالمقابل علبة مسامير وجدتها تحت البرج.'}}},
+ {id:'oldstoker',title:'الوقّاد العجوز',prop:{k:'cars',n:2,frozen:0},
+  lines:['قطار شحن متوقف، وفي قاطرته رجل عجوز يجرف الفحم في فرن مطفأ منذ أيام.','قال: «ثلاثون سنة وأنا أطعم هذه النار. لا أعرف كيف أتوقف.»'],
+  q:'مجرفته ما زالت في يده.',
+  a:{t:'قل له: تعال أطعم ناري',res:{surv:'stoker',text:'ابتسم لأول مرة، وحمل مجرفته إلى قطارك.'}},
+  b:{t:'خذ فحم قطاره',res:{coal:12,text:'أشار لك نحو العربة: «خذ. لم يعد ينفعني.»'}}},
+ {id:'mailbox',title:'صندوق البريد',prop:{k:'house',lit:0},
+  lines:['بيت مهجور، وعلى بابه صندوق بريد أحمر بارز من الثلج.','في داخله شريط كاسيت ملفوف بورقة: «إلى من يمرّ من هنا. من إذاعة الوادي.»'],
+  reward:{tape:0,text:'أخذتَ الشريط. على غلافه بخط مرتب: «سلمى».'}},
+ {id:'fieldtent',title:'خيمة الإسعاف',prop:{k:'house',cross:1,lit:1},
+  lines:['خيمة إسعاف عليها صليب أحمر باهت، وفيها مدفأة كيروسين تحتضر.','امرأة بمعطف أبيض تعدّ ما بقي من الضمادات. «أنا نوال. كنت طبيبة في المدينة. إن كنتَ ذاهباً إلى الشرق… فخذني.»'],
+  q:'تنتظر جوابك.',
+  a:{t:'خذها معك',res:{surv:'doc',text:'جمعت حقيبتها في دقيقة. يبدو أنها كانت جاهزة منذ زمن.'}},
+  b:{t:'خذ الضمادات والدواء',res:{warm:60,hull:5,text:'ضمّدت يديك المتشققتين قبل أن تذهب، ولم تسأل عن شيء.'}}}];
+  const k=STORY_DEFS.findIndex(d=>d.id==='village');
+  STORY_DEFS.splice(k<0?STORY_DEFS.length-2:k,0,...NEW);
+})();
+var SWITCHES=[],MARKS=[],TAPEW={};
+UPG.push(
+ {id:'foglamp',name:'كشاف الضباب',next:['كشاف يكشف السكة ويُبعد الذئاب عن مقدمة القطار'],costs:[14]},
+ {id:'tapes',name:'مشغّل الأشرطة',next:['جهاز كاسيت لتسمع أشرطة إذاعة الوادي (من دفتر الرحلة)'],costs:[12]},
+ {id:'bunk',name:'أسرّة الناجين',next:['سرير إضافي في العربة الوسطى: ناجيان معك','سرير ثالث ودفاية للناجين: ثلاثة معك'],costs:[18,34]}
+);
+const _dp17=drawProp;
+drawProp=function(p,x,fresh){
+  if(p.k==='wtower'){drawWTower(x+20,GY-2,!!p.lit||fresh,1.2);return;}
+  _dp17(p,x,fresh);
+  if(p.cross){const y=GY-2;ctx.save();ctx.fillStyle='#e8eef2';ctx.fillRect(x+96,y-64,2,64);ctx.fillRect(x+82,y-72,30,22);ctx.fillStyle='#c4452a';ctx.fillRect(x+94,y-70,6,18);ctx.fillRect(x+88,y-64,18,6);
+    if(fresh){ctx.globalCompositeOperation='lighter';glow(x+97,y-60,50,'255,120,90',.18);}ctx.restore();}
+};
+function extOutroLines(){
+  extInit();const o=[];
+  if(S.surv.length)o.push('نزل معي '+S.surv.map(s=>SURV_DEF[s.k].n).join(' و')+'. كتبنا أسماءنا على جدار الإذاعة، واحداً تحت الآخر.');
+  if(S.tapes.length>=TAPES.length)o.push('وفي غرفة البث، امرأة متعبة رفعت رأسها عن الميكروفون. عرفتُ صوتها قبل أن أرى وجهها: سلمى.');
+  else if(S.tapes.length)o.push('في الإذاعة سمعتُ الصوت نفسه الذي كان في الأشرطة. لم أقل لها إنني سمعتها طوال الطريق.');
+  return o;
+}
+function extGen(seed){
+  const R=mulberry(seed*31+7),ur=(a,b)=>a+R()*(b-a);
+  SWITCHES=[];MARKS=[];TAPEW={};
+  let d=30000;
+  while(d<GOAL-40000){let x=Math.round(d);
+    while(STATIONS.some(s=>Math.abs(s-x)<1500)||BREAKS.some(b=>Math.abs(b-x)<600)||BLOCKS.some(b=>Math.abs(b.x-x)<600)||STORIES.some(s=>Math.abs(s.x-x)<900))x+=400;
+    SWITCHES.push({x});d=x+ur(52000,68000);}
+  d=2600;while(d<GOAL-1500){MARKS.push({x:Math.round(d),k:Math.floor(R()*7),s:+ur(.85,1.25).toFixed(2),side:R()<.5?1:0,lit:R()<.35});d+=ur(2600,5200);}
+  const n=WRECKS.length;for(let k=0;k<7;k++)TAPEW[Math.min(n-1,Math.floor((k+.5)*n/7))]=k;
+}
+function extInit(){
+  if(S._ext)return;S._ext=1;
+  S.surv=S.surv||[];S.tapes=S.tapes||[];S.log=S.log||[];S.swc=S.swc||{};S.pack=null;S.groundT=0;S.survT=0;S.survCold=S.survCold||0;S.todSaid=-1;S.tapePlay=null;
+}
+const DAYLEN=300;
+function todState(){const prog=clamp(S.d/GOAL,0,1),dayF=.32+.4*prog,ph=(S.playT%DAYLEN)/DAYLEN;
+  const night=ph>dayF;const edge=clamp((1-sstep(dayF-.04,dayF,ph))+sstep(.96,1,ph),0,1);
+  return {ph,dayF,night,day:edge,day_n:Math.floor(S.playT/DAYLEN)+1};}
+function todCold(){if(mode!=='play')return 1;const t=todState();return lerp(1.22,.85,t.day);}
+function survCap(){return 1+L('bunk');}
+function atTower(){if(Math.abs(S.v)>.5||S.ground)return false;for(const s of STATIONS){if(Math.abs(S.d-TENDER_OFF-s)<25)return true;if(s>S.d)break;}return false;}
+const SURV_DEF={
+  mech:{n:'يوسف',role:'ميكانيكي',col:'#3d5a72',job:'يرمّم الهيكل ببطء ويصلح السكة إذا وقفت عندها.'},
+  water:{n:'ليان',role:'تذويب الثلج',col:'#8a3a2e',job:'تذوّب الثلج وتعبّئ المرجل حين ينخفض الماء.'},
+  stoker:{n:'أبو سالم',role:'وقّاد',col:'#5a4a36',job:'يرمي الفحم في الفرن حين ينخفض الجمر.'},
+  doc:{n:'نوال',role:'طبيبة',col:'#6a7f8e',job:'تدفّئك حين تعود من البرد، وتبطئ تجمّدك.'}
+};
+const TAPES=[
+ ['الشريط ١: «هنا إذاعة الوادي»','اسمي سلمى. إن كان أحد يسمع هذا الشريط، فقد وصل إلى يدك من مكان ما على السكة.','نحن قليلون، لكن في الوادي نار لا تنطفئ. سجّلت هذا الشريط وتركته في كل مكان استطعت.'],
+ ['الشريط ٢: «العدّ»','في الأسبوع الأول كنا ثلاثين. في الثاني صرنا اثني عشر.','لا أقول هذا لأخيفك. أقوله لتعرف أن كل من يصل… يُحسب.'],
+ ['الشريط ٣: «الذئاب»','الذئاب لا تهاجم من يقف قرب الضوء. تذكّر هذا حين تنزل في الليل.','وإن سمعت العواء قريباً، لا تركض. ارجع إلى القطار بخطوات ثابتة.'],
+ ['الشريط ٤: «المفترق»','الطريق الشمالي أقصر، لكنه يمرّ في الصقيع القديم. أخي سلكه ولم يصل.','الطريق الجنوبي طويل، لكن عليه صناديق فحم تركناها لكم. اختر بقلبك، لا بالخريطة.'],
+ ['الشريط ٥: «الشمس»','الراصد الذي في المرصد كان محقاً. الغبار يرقّ كل يوم.','البارحة رأيت ظلّي على الثلج. أول ظلّ منذ شهور. بكيت كطفلة.'],
+ ['الشريط ٦: «الأسماء»','نكتب على جدار الإذاعة أسماء من وصلوا. الجدار ما زال فيه مكان.','إن كان معك أحد في القطار، احفظ اسمه. سنكتبه معك.'],
+ ['الشريط ٧: «الضوء الأخير»','هذا آخر شريط سجلته. البطارية تضعف، لكن الوادي قريب منك الآن.','حين ترى ضوءاً ثابتاً في الشرق، اعلم أنني أنا من أشعله. سأبقى مستيقظة حتى تصل.']
+];
+const TAPE_STORY_ID='mailbox';
+function extWreck(i){
+  if(TAPEW&&TAPEW[i]!==undefined)giveTape(TAPEW[i]);
+}
+function giveTape(k){
+  extInit();if(S.tapes.includes(k))return;S.tapes.push(k);S.tapes.sort((a,b)=>a-b);
+  setTimeout(()=>say('وجدتَ شريط كاسيت: '+TAPES[k][0]+(L('tapes')?'. شغّله من دفتر الرحلة (J أو زر الإيقاف).':'. تحتاج «مشغّل الأشرطة» من الورشة لتسمعه.'),6500),900);
+  tone(880,.2,.07,'sine');tone(1320,.25,.05,'sine');saveGame();
+}
+function playTape(k){
+  if(!L('tapes')){return;}
+  closeModal();const t=TAPES[k];S.tapePlay={k,i:1,t:0};say('▶ '+t[0],3800);
+  tone(400,.08,.05,'square');
+}
+function tapeTick(dt){
+  const p=S.tapePlay;if(!p)return;p.t+=dt;
+  if(p.t>(p.i===1?3.8:7.2)){if(p.i>=TAPES[p.k].length){S.tapePlay=null;hideSub();return;}showSub('سلمى: '+TAPES[p.k][p.i]);crackle();clearTimeout(subTimer);subTimer=setTimeout(hideSub,7400);p.i++;p.t=0;}
+}
+function extRes(r){
+  extInit();
+  let extra='';
+  if(r.surv){
+    if(S.surv.some(s=>s.k===r.surv)){}
+    else if(S.surv.length>=survCap()){extra='|لا مكان في عربة الناجين بعد. طوّر «أسرّة الناجين» في الورشة. تركتَ بعض الفحم ومضيت.';S.coalPile=Math.max(0,S.coalPile-3);}
+    else{S.surv.push({k:r.surv,mood:1});const d=SURV_DEF[r.surv];extra=' ركب '+d.n+' معك في العربة الوسطى ('+d.role+').';
+      setTimeout(()=>say(d.n+': '+d.job+' أبقِ النار مشتعلة لنبقى دافئين.',6000),600);}
+  }
+  if(r.tape!==undefined)giveTape(r.tape);
+  if(stCur)S.log.push({t:stCur.def.title,r:extra[0]==='|'?extra.slice(1):(r.text||'')+extra,d:Math.round(S.d)});
+  return extra;
+}
+/* ---------- switches ---------- */
+function applySwitchWorld(x,c){
+  if(c==='short'){const L0=x+6000;
+    DEEPS.push([L0+200,L0+2700]);
+    for(const b of [L0+700,L0+1500,L0+2250])if(!BREAKS.includes(b))BREAKS.push(b);
+    BREAKS.sort((a,b)=>a-b);
+  }else{
+    for(let k=0;k<7;k++){const cx=x+400+k*520;if(!CRATES.some(c=>c.x===cx))CRATES.push({x:cx,n:3});}
+    CRATES.sort((a,b)=>a.x-b.x);
+    const dz=[x+1200,x+1290,.8],dz2=[x+3100,x+3200,.9];
+    for(const z of [dz,dz2])if(!DRIFTS.some(q=>q[0]===z[0]))DRIFTS.push(z);
+    DRIFTS.sort((a,b)=>a[0]-b[0]);
+  }
+}
+function openSwitch(sw){
+  openModal('switch');S.v=Math.min(S.v,6);
+  showOv('<div class="pn story"><div class="ph"><h2>مفترق السكة</h2></div><div class="sb"><p class="tx">أمامك تحويلة. اللافتة الصدئة تشير إلى طريقين.</p>'+
+   '<p class="tx q">الشمالي: أقصر بستة كيلومترات، لكنه يمرّ في الصقيع القديم، وسككه مقطوعة، والذئاب هناك.</p>'+
+   '<p class="tx q">الجنوبي: أطول وأبطأ، فيه ثلوج متراكمة، لكن على جانبيه صناديق فحم.</p></div>'+
+   '<div class="pf"><button type="button" class="btn" id="swS">الطريق الشمالي</button><button type="button" class="btn alt" id="swL">الطريق الجنوبي</button></div></div>');
+  const go=c=>{S.swc[sw.x]=c;applySwitchWorld(sw.x,c);S.log.push({t:'مفترق السكة',r:c==='short'?'سلكتَ الطريق الشمالي القصير عبر الصقيع.':'سلكتَ الطريق الجنوبي الطويل.',d:Math.round(S.d)});
+    closeModal();
+    if(c==='short'){S.d=sw.x+6000;S.lastJoint=Math.floor(S.d/12);camera(0,true);S.shake=.3;burst(900,.4,.15,1.5);say('حوّلتَ السكة شمالاً. الهواء هنا أبرد بكثير… أبقِ النار عالية.',5200);}
+    else say('حوّلتَ السكة جنوباً. الطريق أطول، لكن الفانوس البرتقالي يلمع على الجانبين.',5200);
+    saveGame();};
+  $('swS').addEventListener('click',()=>go('short'));$('swL').addEventListener('click',()=>go('long'));
+}
+/* ---------- wolves ---------- */
+function packTick(dt){
+  const t=todState();
+  if(S.ground){S.groundT+=dt;}else S.groundT=0;
+  const thr=t.night?9:20;
+  const nearDeep=S.deep>.2;
+  if(!S.pack&&S.ground&&S.groundT>(nearDeep?6:thr)){
+    const side=Math.random()<.5?-1:1,n=2+Math.floor(Math.random()*2)+(t.night?1:0);
+    S.pack={a:[],t:0,leave:false};for(let i=0;i<n;i++)S.pack.a.push({x:S.gd+side*(70+i*8),vx:0,ph:Math.random()*6,off:(i-(n-1)/2)*4+side*6,bite:0,back:0});
+    tone(300,1.8,.05,'sine',180);setTimeout(()=>tone(260,1.4,.04,'sine',170),700);
+    if(!S.said.wolf){S.said.wolf=1;say('عواء قريب… الذئاب شمّت رائحتك. ارجع إلى القطار.',5200);}
+  }
+  const P=S.pack;if(!P)return;P.t+=dt;
+  const scare=!S.ground||(L('foglamp')>0&&S.gd>S.d-20&&S.gd<S.d+70)||(t.day>.8&&P.t>25);
+  if(scare&&!P.leave){P.leave=true;}
+  let alive=0;
+  for(const a of P.a){
+    a.ph+=dt*(Math.abs(a.vx)>2?12:3);
+    if(P.leave){a.vx+=((a.x>S.gd?1:-1)*45-a.vx)*dt*2;}
+    else{
+      const tx=S.gd+a.off,dx=tx-a.x;
+      const want=a.back>0?-Math.sign(dx)*30:clamp(dx*1.6,-26,26);a.back=Math.max(0,a.back-dt);
+      a.vx+=(want-a.vx)*dt*3;
+      if(Math.abs(S.gd-a.x)<5&&a.back<=0){a.bite+=dt;if(a.bite>1.6){a.bite=0;a.back=1.2;S.warm=Math.max(0,S.warm-14);S.shake=.45;S.flash=.25;burst(1200,.2,.2,2);tone(180,.25,.12,'sawtooth',90);
+        if(!S.said.bite){S.said.bite=1;say('عضّة! الذئب يسرق دفأك. ارجع إلى القطار أو أشعل كشاف الضباب.',4500);}}}
+      else a.bite=Math.max(0,a.bite-dt);
+    }
+    a.x+=a.vx*dt;if(Math.abs(a.x-S.gd)<160)alive++;
+  }
+  if(P.leave&&(alive===0||P.t>40))S.pack=null;
+}
+function drawPack(){
+  const P=S.pack;if(!P)return;const night=!todState().day;
+  for(const a of P.a){const x=sxw(a.x);if(x<WINL-60||x>WINR+60)continue;ctx.save();ctx.translate(x,GY+ey(a.x)-6);ctx.scale(1.5,1.5);drawCritShape('wolf',Math.abs(a.vx)>2,a.ph,a.vx<0?-1:1);
+    const dir=a.vx<0?-1:1;ctx.fillStyle='rgba(255,220,120,'+(.6+.4*Math.sin(S.t*3+a.off))+')';circ(17*dir,-18.5,1.1);ctx.fill();
+    if(night){ctx.save();ctx.globalCompositeOperation='lighter';glow(17*dir,-18.5,7,'255,210,110',.5);ctx.restore();}ctx.restore();}
+}
+/* ---------- survivors ---------- */
+function survTick(dt){
+  const ss=S.surv;if(!ss.length)return;
+  const warmCar=S.Tf>.12||L('heat')>=2;
+  S.survCold=clamp(S.survCold+(warmCar?-dt*2:dt),0,90);
+  const working=S.survCold<60;
+  if(S.survCold>=60&&!S.said.survCold){S.said.survCold=1;say('الناجون في العربة الوسطى يرتجفون. النار ضعيفة، فتوقفوا عن العمل.',5200);}
+  if(S.survCold<20)S.said.survCold=0;
+  if(!working)return;
+  for(const s of ss){
+    if(s.k==='stoker'){s.t=(s.t||0)-dt;if(s.t<=0&&S.fuel<1.8&&S.coalPile>0&&!S.tut){S.coalPile--;S.fuel=Math.min(12,S.fuel+1);S.throws++;S.doorOpen=.55;S.smoke=1.6;s.t=7;burst(900,.2,.08,1.5);tone(120,.12,.05);}}
+    if(s.k==='water'&&S.W<75&&S.Tf>.15){S.W=Math.min(100,S.W+1.1*dt);s.busy=1;}else if(s.k==='water')s.busy=0;
+    if(s.k==='mech'){if(S.hull<100)S.hull=Math.min(100,S.hull+.09*dt);
+      const nb=nextBreak();if(nb!==null&&nb-S.d<repairReach()&&Math.abs(S.v)<.5&&S.work!=='repair'){s.rep=(s.rep||0)+dt;s.busy=1;if(s.rep>=8){s.rep=0;fixBreak(nb,'أصلح يوسف السكة.');}}else{s.rep=0;s.busy=0;}}
+    if(s.k==='doc'&&!S.ground&&S.px>300&&S.px<640&&S.warm<80)S.warm=Math.min(100,S.warm+2.2*dt);
+  }
+}
+function survBurn(){return 1+.05*(S.surv?S.surv.length:0);}
+function drawSurvivors(){
+  extInit();
+  const bunk=L('bunk');if(!S.surv.length&&!bunk)return;
+  ctx.save();ctx.translate(TL,0);beginPose(carPose(0,S.cs[2].x));
+  if(bunk){ctx.fillStyle='#4a3826';ctx.fillRect(96,FLOOR-14,72,4);ctx.fillStyle='#6a2c24';rr(98,FLOOR-21,68,8,3);ctx.fill();ctx.fillStyle='#e8dcc8';rr(100,FLOOR-26,13,6,2);ctx.fill();}
+  const cold=S.survCold>=60;
+  S.surv.forEach((s,i)=>{const d=SURV_DEF[s.k];const x=104+i*29,sh=cold?Math.sin(S.t*50+i)*.8:0,bob=Math.sin(S.t*1.4+i*2)*.6;
+    ctx.save();ctx.translate(sh,0);person(x,FLOOR,38,d.col,bob,s.busy?[10,-24+Math.sin(S.t*9)*3]:null);
+    ctx.fillStyle='rgba(240,220,190,.85)';circ(x+2,FLOOR-32+bob,3.4);ctx.fill();
+    if(s.k==='doc'){ctx.fillStyle='#c4452a';ctx.fillRect(x-2,FLOOR-24+bob,4,1.5);ctx.fillRect(x-.75,FLOOR-25.5+bob,1.5,4.5);}
+    if(s.k==='stoker'){ctx.fillStyle='#2b2118';ctx.fillRect(x-5,FLOOR-38+bob,10,3);}
+    if(s.k==='water'){ctx.fillStyle='#9a3a2e';circ(x,FLOOR-36+bob,3);ctx.fill();}
+    if(s.k==='mech'){ctx.fillStyle='#d4a24a';ctx.fillRect(x-4,FLOOR-37+bob,8,2);}
+    ctx.restore();});
+  ctx.restore();ctx.restore();
+}
+/* ---------- water towers & switches & landmarks drawing ---------- */
+function drawWTower(x,y,lit,sc){
+  ctx.save();ctx.translate(x,y);if(sc)ctx.scale(sc,sc);
+  ctx.strokeStyle='#2a3a4a';ctx.lineWidth=5;
+  for(const dx of [-26,26]){ctx.beginPath();ctx.moveTo(dx,0);ctx.lineTo(dx*.6,-120);ctx.stroke();}
+  ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-24,-30);ctx.lineTo(20,-70);ctx.moveTo(24,-30);ctx.lineTo(-20,-70);ctx.stroke();
+  ctx.fillStyle=lin(-34,0,34,0,[[0,'#3a2a1e'],[.5,'#6d4a2c'],[1,'#3a2a1e']]);rr(-34,-178,68,60,6);ctx.fill();
+  ctx.fillStyle='#22313f';for(const yy of [-170,-150,-128])ctx.fillRect(-35,yy,70,3);
+  ctx.fillStyle='#e6f2f8';ctx.beginPath();ctx.moveTo(-40,-178);ctx.lineTo(0,-200);ctx.lineTo(40,-178);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#4d6578';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(30,-130);ctx.lineTo(70,-140);ctx.stroke();
+  ctx.fillStyle='#4d6578';rr(64,-146,14,10,2);ctx.fill();
+  ctx.strokeStyle='#8aa2b3';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(71,-136);ctx.lineTo(71,-110+Math.sin(S.t*2)*2);ctx.stroke();
+  ctx.fillStyle='rgba(215,236,247,.9)';for(let i=0;i<8;i++){const ix=-30+i*8.5,l=6+hash(i*3.3)*12;ctx.beginPath();ctx.moveTo(ix-2,-118);ctx.lineTo(ix+2,-118);ctx.lineTo(ix,-118+l);ctx.fill();}
+  if(lit){ctx.fillStyle='#ffd2a0';circ(0,-106,4);ctx.fill();ctx.save();ctx.globalCompositeOperation='lighter';glow(0,-106,50,'255,170,90',.3);ctx.restore();}
+  ctx.restore();
+}
+function drawTowers(){
+  const off=distM(503);
+  for(const s of STATIONS){const wd=s+TENDER_OFF-off,x=sxw(wd)-40;if(x<WINL-200||x>WINR+200)continue;ctx.save();ctx.translate(0,ey(wd));drawWTower(x-30,GY-14,atTower(),1.75);ctx.restore();}
+}
+function drawSwitches(){
+  for(const sw of SWITCHES){const x=sxw(sw.x);if(x<WINL-400||x>WINR+900)continue;const c=S.swc[sw.x];
+    ctx.save();ctx.translate(0,ey(sw.x));
+    ctx.strokeStyle='#aec4d3';ctx.lineWidth=3;ctx.globalAlpha=.8;ctx.beginPath();ctx.moveTo(x,GY);ctx.bezierCurveTo(x+200,GY,x+380,GY-38,x+760,GY-70);ctx.stroke();ctx.globalAlpha=1;
+    ctx.fillStyle='#0c1826';ctx.fillRect(x-40,GY-96,5,96);
+    ctx.save();ctx.translate(x-38,GY-92);
+    ctx.fillStyle='#3a2f24';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(58,-6);ctx.lineTo(66,4);ctx.lineTo(58,14);ctx.lineTo(0,10);ctx.fill();
+    ctx.beginPath();ctx.moveTo(0,16);ctx.lineTo(58,20);ctx.lineTo(66,30);ctx.lineTo(58,40);ctx.lineTo(0,30);ctx.fill();
+    ctx.font='600 9px "Noto Sans Arabic",Tahoma,sans-serif';ctx.direction='rtl';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=c==='short'?'#ffb27a':'#cfe0ea';ctx.fillText('شمال',30,4);ctx.fillStyle=c==='long'?'#ffb27a':'#cfe0ea';ctx.fillText('جنوب',30,25);ctx.direction='ltr';
+    ctx.restore();snowCap(x-42,GY-96,70);
+    ctx.fillStyle='#22313f';ctx.fillRect(x+16,GY-30,14,30);ctx.fillStyle='#c4452a';ctx.save();ctx.translate(x+23,GY-30);ctx.rotate(c==='short'?.5:-.5);ctx.fillRect(-2,-22,4,22);ctx.restore();
+    ctx.restore();}
+}
+function drawMark(m,x,y){
+  ctx.save();ctx.translate(x,y);ctx.scale(m.s,m.s);
+  const dk='#0f2133',rim='rgba(205,226,240,.55)';ctx.fillStyle=dk;ctx.strokeStyle=rim;ctx.lineWidth=1.4;
+  switch(m.k){
+    case 0:{ctx.beginPath();ctx.moveTo(-20,0);ctx.lineTo(-12,-110);ctx.lineTo(12,-110);ctx.lineTo(20,0);ctx.fill();ctx.beginPath();ctx.moveTo(-18,-110);ctx.lineTo(0,-130);ctx.lineTo(18,-110);ctx.fill();
+      ctx.save();ctx.translate(0,-96);ctx.rotate(.4+Math.sin(S.t*.3)*.04);ctx.fillStyle='#1d3247';for(let i=0;i<4;i++){ctx.rotate(Math.PI/2);ctx.fillRect(-4,-4,8,-62);ctx.strokeRect(-4,-4,8,-62);}ctx.restore();
+      if(m.lit){ctx.fillStyle='rgba(255,184,102,.95)';ctx.fillRect(-4,-70,8,10);}snowCap(-14,-110,28);break;}
+    case 1:{for(const dx of [-50,50]){ctx.strokeStyle='#1d3247';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(dx,0);ctx.lineTo(0,-90);ctx.stroke();}
+      ctx.save();ctx.translate(0,-90);ctx.rotate(S.t*.02);ctx.strokeStyle='rgba(170,200,220,.6)';ctx.lineWidth=2;circ(0,0,74);ctx.stroke();
+      for(let i=0;i<10;i++){const a=i/10*Math.PI*2;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*74,Math.sin(a)*74);ctx.stroke();ctx.save();ctx.translate(Math.cos(a)*74,Math.sin(a)*74);ctx.rotate(-S.t*.02);ctx.fillStyle=i%3?'#6a2a24':'#7a6420';ctx.fillRect(-7,0,14,11);ctx.restore();}ctx.restore();break;}
+    case 2:{ctx.save();ctx.rotate(-.06);ctx.fillStyle='#8a4a22';rr(-70,-40,140,36,5);ctx.fill();ctx.fillStyle='rgba(150,200,225,.4)';for(let i=0;i<6;i++)ctx.fillRect(-60+i*20,-34,14,12);ctx.fillStyle='#0d1824';circ(-44,-4,8);ctx.fill();circ(44,-4,8);ctx.fill();ctx.restore();
+      ctx.fillStyle='#e6f2f8';ctx.beginPath();ctx.ellipse(-40,0,46,14,0,Math.PI,0);ctx.fill();ctx.beginPath();ctx.ellipse(50,0,30,10,0,Math.PI,0);ctx.fill();snowCap(-70,-44,140);break;}
+    case 3:{ctx.strokeStyle='#5a2a24';ctx.lineWidth=2;for(let i=0;i<3;i++){const a=i*2.1;ctx.beginPath();ctx.moveTo(Math.cos(a)*24,0);ctx.lineTo(0,-200);ctx.stroke();}
+      for(let k=1;k<8;k++){const y=-k*25,w=24*(1-k/8);ctx.beginPath();ctx.moveTo(-w,y);ctx.lineTo(w,y);ctx.stroke();}
+      if(Math.sin(S.t*2+m.x)>0){ctx.fillStyle='#ff4a3a';circ(0,-204,3.5);ctx.fill();ctx.save();ctx.globalCompositeOperation='lighter';glow(0,-204,30,'255,70,50',.5);ctx.restore();}
+      ctx.fillStyle=dk;rr(30,-34,40,34,2);ctx.fill();if(m.lit){ctx.fillStyle='rgba(255,184,102,.95)';ctx.fillRect(44,-24,12,10);}snowCap(28,-36,44);break;}
+    case 4:{ctx.fillRect(-50,-60,100,60);ctx.beginPath();ctx.moveTo(-58,-60);ctx.lineTo(0,-96);ctx.lineTo(58,-60);ctx.fill();ctx.fillRect(-70,-120,22,120);ctx.beginPath();ctx.moveTo(-74,-120);ctx.lineTo(-59,-150);ctx.lineTo(-44,-120);ctx.fill();
+      ctx.fillStyle=m.lit?'rgba(255,184,102,.9)':'#081320';circ(0,-44,10);ctx.fill();ctx.fillStyle='rgba(190,225,245,.55)';ctx.fillRect(-56,-30,112,30);
+      ctx.fillStyle='rgba(225,242,250,.9)';for(let i=0;i<10;i++){const ix=-48+i*10;ctx.beginPath();ctx.moveTo(ix-2,-60);ctx.lineTo(ix+2,-60);ctx.lineTo(ix,-60+6+hash(i)*10);ctx.fill();}break;}
+    case 5:{ctx.fillRect(-26,-30,52,30);ctx.save();ctx.fillStyle='#4a3a2a';ctx.translate(0,-30);ctx.beginPath();ctx.moveTo(-6,0);ctx.lineTo(-10,-60);ctx.lineTo(6,-60);ctx.lineTo(4,0);ctx.fill();circ(-2,-70,9);ctx.fill();ctx.strokeStyle='#4a3a2a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(2,-52);ctx.lineTo(16,-92);ctx.stroke();ctx.restore();
+      const f=.7+.3*Math.sin(S.t*7);ctx.save();ctx.globalCompositeOperation='lighter';ctx.fillStyle='rgba(255,140,50,'+f+')';circ(16,-126,4);ctx.fill();glow(16,-126,34,'255,130,50',.35*f);ctx.restore();
+      ctx.fillStyle='rgba(190,225,245,.35)';rr(-30,-150,60,120,10);ctx.fill();ctx.strokeStyle='rgba(225,242,250,.5)';ctx.stroke();break;}
+    case 6:{ctx.save();ctx.rotate(.12);ctx.fillStyle='#4a5866';rr(-90,-30,160,22,10);ctx.fill();ctx.beginPath();ctx.moveTo(60,-28);ctx.lineTo(96,-20);ctx.lineTo(60,-10);ctx.fill();ctx.fillRect(-20,-28,60,-6);ctx.beginPath();ctx.moveTo(-40,-22);ctx.lineTo(10,-22);ctx.lineTo(-60,-60);ctx.lineTo(-70,-60);ctx.fill();
+      ctx.fillStyle='#8a2a24';ctx.beginPath();ctx.moveTo(-90,-26);ctx.lineTo(-104,-60);ctx.lineTo(-86,-60);ctx.lineTo(-74,-26);ctx.fill();ctx.restore();ctx.fillStyle='#e6f2f8';ctx.beginPath();ctx.ellipse(0,0,80,12,0,Math.PI,0);ctx.fill();break;}
+  }
+  ctx.restore();
+}
+function drawLandmarks(){
+  if(!MARKS)return;
+  for(const m of MARKS){const wx=m.x,x=sxw(wx)+(m.side?160:-140);if(x<WINL-260||x>WINR+260)continue;
+    if(STATIONS.some(s=>Math.abs(s-wx)<900))continue;
+    ctx.save();ctx.translate(0,ey(wx));ctx.globalAlpha=.92;drawMark(m,x,GY-10);ctx.restore();}
+}
+/* ---------- day / night ---------- */
+function todOverlay(){
+  if(mode!=='play'&&mode!=='over')return;
+  const t=todState();
+  ctx.save();ctx.setTransform(DPR,0,0,DPR,0,0);
+  const n=1-t.day;
+  if(n>.01){ctx.fillStyle='rgba(2,5,14,'+(.2*n)+')';ctx.fillRect(0,0,CW,CH);}
+  if(t.day>.01){ctx.globalCompositeOperation='screen';ctx.fillStyle='rgba(120,150,180,'+(.12*t.day)+')';ctx.fillRect(0,0,CW,CH);ctx.globalCompositeOperation='source-over';}
+  ctx.restore();
+}
+function todTick(){
+  const t=todState(),key=t.day_n*2+(t.night?1:0);
+  if(S.todSaid===-1){S.todSaid=key;return;}
+  if(key!==S.todSaid){S.todSaid=key;if(S.tut)return;
+    if(t.night)say('نزل الليل. البرد أقسى، والذئاب تخرج. لا تبتعد عن القطار.',5200);
+    else say('طلع الصبح، اليوم '+t.day_n+'. النهار يطول كلما اقتربنا من الشرق.',5200);}
+}
+/* ---------- journal ---------- */
+function openJournal(back){
+  extInit();const wasPause=S.modal==='pause';openModal('journal');
+  const t=todState(),km=(S.d/1000).toFixed(1),tot=(GOAL/1000).toFixed(0),st=Object.keys(S.looted).length;
+  const sv=S.surv.length?S.surv.map(s=>{const d=SURV_DEF[s.k];return '<div class="uc"><div class="un"><b>'+d.n+'</b><span class="lv">'+d.role+'</span></div><p>'+d.job+'</p></div>';}).join(''):'<div class="uc"><p>لا أحد معك بعد. بعض من تلقاهم على الطريق قد يركبون معك.</p></div>';
+  const tp=TAPES.map((x,k)=>{const has=S.tapes.includes(k);return '<div class="uc'+(has?'':' full')+'"><div class="un"><b>'+(has?x[0]:'شريط مفقود')+'</b></div>'+(has?(L('tapes')?'<button type="button" class="buy" data-tp="'+k+'">شغّل</button>':'<p>يحتاج «مشغّل الأشرطة» من الورشة.</p>'):'<p>ربما في حطام ما على الطريق.</p>')+'</div>';}).join('');
+  const lg=S.log.length?S.log.slice().reverse().map(e=>'<div class="uc"><div class="un"><b>'+e.t+'</b><span class="lv">كم '+(e.d/1000).toFixed(1)+'</span></div><p>'+e.r+'</p></div>').join(''):'<div class="uc"><p>الصفحات ما زالت فارغة.</p></div>';
+  showOv('<div class="pn"><div class="ph"><h2>دفتر الرحلة</h2><span class="sc">اليوم '+t.day_n+' · '+km+' من '+tot+' كم</span></div><div class="ug" style="grid-template-columns:minmax(0,1fr)">'+
+    '<div class="uc"><p>محطات: '+st+' · قصص: '+Object.keys(S.told).length+' · أشرطة: '+S.tapes.length+'/'+TAPES.length+' · ناجون: '+S.surv.length+'/'+survCap()+'</p></div>'+
+    '<h3 style="margin:6px 0 0;font-size:16px">الناجون</h3>'+sv+'<h3 style="margin:6px 0 0;font-size:16px">أشرطة سلمى</h3>'+tp+'<h3 style="margin:6px 0 0;font-size:16px">ما حدث</h3>'+lg+
+    '</div><div class="pf"><button type="button" class="btn" id="jClose">أغلق الدفتر</button></div></div>');
+  ovEl.querySelectorAll('[data-tp]').forEach(b=>b.addEventListener('click',()=>{S.modal='journal';playTape(+b.dataset.tp);try{if(AC&&AC.resume)AC.resume();}catch(e){}}));
+  $('jClose').addEventListener('click',()=>{if(wasPause){S.modal='pause';renderPause();}else closeModal();});
+}
+addEventListener('keydown',e=>{if(e.code==='KeyJ'&&mode==='play'&&S&&!S.over&&!S.modal){openJournal();e.preventDefault();}});
+/* ---------- master tick ---------- */
+function extUpdate(dt){
+  extInit();
+  todTick();packTick(dt);survTick(dt);tapeTick(dt);
+  for(const sw of SWITCHES){if(S.swc[sw.x])continue;
+    if(S.d>sw.x){S.swc[sw.x]='long';applySwitchWorld(sw.x,'long');continue;}
+    if(S.d>sw.x-240){openSwitch(sw);if(!S.said.swHint){S.said.swHint=1;}break;}
+    if(S.d>sw.x-700&&!S.said['sw'+sw.x]&&S.v>2){S.said['sw'+sw.x]=1;ding();say('مفترق سكة أمامنا. سنختار الطريق بعد قليل.',4200);}
+  }
+}
+
+window.__ext=()=>({SWITCHES,MARKS,TAPEW,TAPES,SURV_DEF});
+
 /* ===== DEVELOPER BUILD ONLY: test panel ===== */
 (function(){
   const st=document.createElement('style');
@@ -4036,6 +4366,11 @@ window.__gfx=3;
     A('فحم +20',()=>{S.coalPile=Math.min(pileCap(),S.coalPile+20);});A('حطب +10',()=>{S.crateN=(S.crateN||0)+10;});A('خردة +50',()=>{S.scrap+=50;});A('الفرن ممتلئ',()=>{S.fuel=12;S.Tf=1;});A('هيكل 100',()=>{S.hull=100;});A('دفء 100',()=>{S.warm=100;});A('سرعة 40',()=>{S.v=40;});
     A('كل الترقيات',()=>{UPG.forEach(u=>{S.upg[u.id]=u.next.length;});});
     A('وضع الإله: '+(god?'يعمل':'متوقف'),b=>{god=!god;b.textContent='وضع الإله: '+(god?'يعمل':'متوقف');b.classList.toggle('on',god);});
+    H('الحزمة الجديدة');
+    ['mech','water','stoker','doc'].forEach(k=>A('ناجٍ: '+SURV_DEF[k].n,()=>{if(!S.surv.find(s=>s.k===k)&&S.surv.length<survCap())S.surv.push({k,mood:1});}));
+    A('كل الأشرطة',()=>{S.tapes=TAPES.map((t,i)=>i);});
+    SWITCHES.forEach((s,i)=>A('مفترق '+(i+1),()=>{S.d=s.x-600;}));
+    A('الليل الآن',()=>{S.playT=Math.max(S.playT,600);});
     H('أحداث');
     A('إعصار الآن',()=>{S.playT=Math.max(S.playT,101);HUR.cd=0;});
     ['wolves','supply','pipes','lightning','aurora','steam','frost','signal'].forEach(k=>A(k,()=>{EV.force=k;EV.cd=.01;}));
@@ -4486,14 +4821,14 @@ function render(){
   const piv=TL+380;
   ctx.translate(piv,GY);ctx.rotate(S.tilt);ctx.translate(-piv,-GY);
   for(let i=0;i<STATIONS.length;i++)drawStation(i);
-  drawGoal();drawTunnelBack();drawTrack();trainShadow();drawDrifts();drawBreaks();drawBlocks();drawDebris();drawSites();drawCreatures();drawWowBack();fogLayer(S.fog,false);
+  drawGoal();drawTunnelBack();drawTrack();trainShadow();drawDrifts();drawBreaks();drawBlocks();drawDebris();drawSites();drawCreatures();drawPack();drawWowBack();fogLayer(S.fog,false);
   ctx.save();ctx.translate(0,Math.sin(S.t*38)*S.bump*1.4);
-  ctx.save();trainScale();drawHeap();drawRearCars();ctx.save();ctx.translate(TL,0);beginPose(locoPose());ctx.translate(-TL,0);drawTrain();drawUpgrades();drawStoke();drawHurTrain();drawCabExtras();drawCabBrake();drawGauges();drawCargo();drawWheelHeat();drawDoorEtc();fireLight();ctx.restore();ctx.restore();if(!S.ground){beginPose(playerPoseP());drawPlayer();ctx.restore();}drawShell();ctx.restore();drawCrates();drawStopFronts();drawLadderMark();drawZonesFx();if(S.ground)drawGroundPlayer();drawWowFront();
+  ctx.save();trainScale();drawHeap();drawRearCars();ctx.save();ctx.translate(TL,0);beginPose(locoPose());ctx.translate(-TL,0);drawTrain();drawUpgrades();drawStoke();drawHurTrain();drawCabExtras();drawCabBrake();drawGauges();drawCargo();drawWheelHeat();drawDoorEtc();fireLight();ctx.restore();drawSurvivors();ctx.restore();if(!S.ground){beginPose(playerPoseP());drawPlayer();ctx.restore();}drawShell();ctx.restore();drawCrates();drawLandmarks();drawTowers();drawSwitches();drawStopFronts();drawLadderMark();drawZonesFx();if(S.ground)drawGroundPlayer();drawWowFront();
   ctx.restore();
   drawTargetMarker();drawPromptTag();
   ctx.restore();
   ctx.save();trainScale();drawFx();ctx.restore();drawNearDepth();drawFg();drawSnow();fogLayer(S.fog,true);
-  gradePass();bloomPass(_frameDt);overlays();
+  todOverlay();gradePass();bloomPass(_frameDt);overlays();
 }
 
 /* ---------- per-frame effects ---------- */
