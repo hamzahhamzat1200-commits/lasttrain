@@ -488,7 +488,10 @@ function promptFor(t){
     case 'lever':return {l:S.work==='lever'?'حرّك يميناً أو يساراً':'ذراع الدفع',hold:1};
     case 'brake':return {l:S.brkOn?'حرّر المكبح':'اسحب المكبح'};
     case 'pipe':return S.leak?{l:'سدّ التسريب',hold:1}:null;
-    case 'roof':return ((S.chim||0)>.08||(S.roofSnow||0)>.08)?{l:'اصعد إلى السطح ونظّف الثلج',hold:1}:{l:'السطح نظيف',dead:true};
+    case 'roof':return {l:'اصعد السلّم إلى السطح'};
+    case 'rdown':return {l:'انزل السلّم'};
+    case 'rfix':return {l:'أصلح الثقب في السقف',hold:1};
+    case 'rclean':return {l:'نظّف الثلج عن السطح',hold:1};
     case 'camera':return FL('camera')?(X6().cam?{l:X6().film>0?'ارفع الكاميرا ('+X6().film+' فيلم)':'لا أفلام',dead:X6().film<=0}:{l:'خذ الكاميرا القديمة'}):null;
     case 'whistle':return (S.whCd>0||S.P<10)?{l:'الصفّارة تستريح',dead:true}:{l:'اسحب حبل الصفّارة'};
     case 'bench':return {l:'ماكينة الإصلاح والورشة'};
@@ -566,7 +569,7 @@ function tutorialTick(dt){
 
 /* ---------- game update ---------- */
 function shelterAt(px){
-  if(S.ground)return 0;
+  if(S.ground||S.roofUp)return 0;
   const hz=L('heat');
   let b;
   if(px<-10)b=hz>=1?.97:.86;
@@ -619,13 +622,13 @@ function update(dt){
   S.playT+=dt;
   const dirIn=S.clim?0:(inp.right?1:0)-(inp.left?1:0);
   const act=S.clim?false:inp.act,pressed=S.clim?false:inp.pressed;inp.pressed=false;
-  if(S.clim){const c=S.clim;c.t+=dt/1.25;const k=clamp((c.t-.14)/.72,0,1),ee=k*k*(3-2*k)*.55+k*.45;
-    c.dy=37*(c.dir>0?ee:1-ee);c.legs=(c.t>.12&&c.t<.9)?Math.sin(c.t*17)*2.6:0;c.jump=0;
+  if(S.clim){const c=S.clim;c.t+=dt/(c.kind==='roof'?1.9:1.25);const k=clamp((c.t-.14)/.72,0,1),ee=k*k*(3-2*k)*.55+k*.45;
+    c.dy=(c.kind==='roof'?-ROOF_H:37)*(c.dir>0?ee:1-ee);c.legs=(c.t>.12&&c.t<.9)?Math.sin(c.t*17)*2.6:0;c.jump=0;
     const rung=Math.floor(k*6);if(rung!==c._rung&&k>0&&k<1){c._rung=rung;burst(1900,.05,.07,7);tone(rung%2?520:430,.04,.04,'square');}
-    S.face=1;S.pv=0;S.px=714;
-    if(c.t>=1){if(c.dir>0){S.ground=true;S.gd=S.d-9;}S.clim=null;S.chr.sq=.55;tone(150,.1,.08,'triangle');burst(500,.14,.1,1.5);
-      for(let i=0;i<8;i++)S.spray.push({x:TL+714+rnd(-6,6),y:GY-2,vx:rnd(-55,55),vy:rnd(-70,-20),a:.8,r:rnd(1.2,2.6)});}}
-  const near=S.clim?null:(S.ground?groundNear():nearest());S.near=near;
+    S.face=1;S.pv=0;S.px=(c.kind==='roof'?60:714);
+    if(c.t>=1){if(c.kind==='roof'){S.roofUp=c.dir>0;}else if(c.dir>0){S.ground=true;S.gd=S.d-9;}S.clim=null;S.chr.sq=.55;tone(150,.1,.08,'triangle');burst(500,.14,.1,1.5);
+      for(let i=0;i<(c.kind==='roof'?0:8);i++)S.spray.push({x:TL+714+rnd(-6,6),y:GY-2,vx:rnd(-55,55),vy:rnd(-70,-20),a:.8,r:rnd(1.2,2.6)});}}
+  const near=S.clim?null:(S.ground?groundNear():(S.roofUp?roofNear():nearest()));S.near=near;
   const st=stationNow();
   const nb=nextBreak(),reach=repairReach();
   const blocked=nb!==null&&nb-S.d<reach&&Math.abs(S.v)<.5;
@@ -673,7 +676,10 @@ function update(dt){
       case 'brake':if(pressed)toggleBrake();break;
       case 'water':if(act&&S.W<99.5)work='water';break;
       case 'pipe':if(act&&S.leak)work='leakfix';break;
-      case 'roof':if(act&&((S.chim||0)>.08||(S.roofSnow||0)>.08))work='roof';break;
+      case 'roof':if(pressed&&!S.roofUp){S.clim={dir:1,kind:'roof',t:0,dy:0,legs:0};S.face=1;S.pv=0;S.px=60;tone(300,.12,.08);}break;
+      case 'rdown':if(pressed){S.clim={dir:-1,kind:'roof',t:0,dy:-ROOF_H,legs:0};S.face=1;S.pv=0;S.px=60;tone(260,.12,.08);}break;
+      case 'rclean':if(act)work='roof';break;
+      case 'rfix':if(act)work='rfix';break;
       case 'whistle':if(pressed)whistle();break;
       case 'camera':if(pressed&&FL('camera'))cameraAct();break;
       case 'bench':if(pressed){S.benchOpened=true;openUpgrades();return;}break;
@@ -724,6 +730,7 @@ function update(dt){
   }else S.load=Math.max(0,S.load-dt*2);
   if(work==='water'){const _tw=atTower();S.W=Math.min(100,S.W+(_tw?45:9*clamp(.25+S.Tf*1.5,.25,1))*dt);if(_tw&&Math.random()<.4)S.spray.push({x:TL+503+rnd(-4,4),y:FLOOR-150,vx:rnd(-20,20),vy:rnd(20,80),a:.9,r:rnd(1.5,3)});S.Tf*=Math.exp(-.04*dt);if(Math.random()<.15)burst(2600,.08,.05,2);}
   if(work==='roof')roofWork(dt);
+  if(work==='rfix')rfixWork(dt);
   if(work==='leakfix'){S.leakFix+=dt;if(Math.random()<.3)burst(1800,.05,.08,3);if(S.leakFix>=3){S.leak=false;S.leakFix=0;tone(520,.25,.09);say('سددتَ التسريب.',2600);}}
   else S.leakFix=Math.max(0,S.leakFix-dt);
   if(work==='gwheel')ojWork(dt);
@@ -736,7 +743,8 @@ function update(dt){
   /* player body */
   const warmF=clamp(S.warm/60,.35,1);
   const vmax=140*warmF*(S.carry?.88:1);
-  if(work||S.brkAnim>.25){S.pv=0;}
+  if(S.roofUp&&!S.clim){roofBody(dt,dirIn,work);}
+  else if(work||S.brkAnim>.25){S.pv=0;}
   else{
     S.slopeAng=playerPoseP().ang;const sa=S.slopeAng;
     const target=dirIn*vmax*(1+clamp(dirIn*sa*2.5,-.5,.5));
@@ -748,7 +756,7 @@ function update(dt){
   }
   const px0=S.px;
   if(S.ground){const sp=(work?0:dirIn)*40*warmF*(S.carry?(S.ck==='crate'?.65:.9):1);S.gd=clamp(S.gd+sp*dt,S.d-420,S.d+700);S.pv=sp*PX/TS;if(dirIn&&!work)S.face=dirIn;}
-  else S.px=clamp(S.px+S.pv*dt,-585,716);
+  else{S.px=clamp(S.px+S.pv*dt,-585,716);if(S.roofUp&&!S.clim)roofEdge();}
   
   if(S.doorA<.5&&!S.ground&&!S.clim&&dirIn!==0&&((px0>=602.5&&px0<606&&dirIn>0)||(px0>=606&&px0<=609.5&&dirIn<0))){S._bump=(S._bump||0)+dt;if(S._bump>.25){S._bump=0;S.doorWant=true;S.doorOpen=0;tone(200,.25,.1,'square',120);say('الباب كان مغلقاً فدفعته وفتحته. اضغط «تفاعل» لإغلاقه.',3200);}}else S._bump=0;
   if(S.doorA<.5){if(px0<606)S.px=Math.min(S.px,603);else S.px=Math.max(S.px,609);}
@@ -1129,7 +1137,8 @@ function camera(dt,snap){
   const pwx=S.ground?sxw(S.gd):FS-(FS-(TL+S.px))*TS,cwx=FS-VWIN*.18;
   const k=clamp((.75-ZOOM)/.35,0,1);
   const tx=clamp(lerp(pwx,cwx,k)-VWIN/2,XMIN,Math.max(XMIN,VW-VWIN));
-  const ty=lerp(315-vh/2+(ZOOM<1?(1-ZOOM)*40:0),GY+30-vh*.62,k);
+  S.roofCam=(S.roofCam||0)+(((S.roofUp||(S.clim&&S.clim.kind==='roof'&&S.clim.dir>0&&S.clim.t>.4))&&!(S.clim&&S.clim.dir<0&&S.clim.t>.6)?1:0)-(S.roofCam||0))*(1-Math.exp(-3*dt));
+  const ty=lerp(315-vh/2+(ZOOM<1?(1-ZOOM)*40:0),GY+30-vh*.62,k)-S.roofCam*47;
   if(snap){CAMX=tx;CAMY=ty;}
   else{const kk=1-Math.exp(-4*dt);CAMX+=(tx-CAMX)*kk;CAMY+=(ty-CAMY)*kk;}
   WINL=CAMX-40;WINR=CAMX+VWIN+40;
@@ -4903,6 +4912,10 @@ function roofTick(dt){
   if(S.chim<.25)S.said.chim=0;
   if(S.roofSnow>.6&&!S.said.rsn){S.said.rsn=1;say('الثلج على السطوح ثقيل، والقطار صار أبطأ. نظّف السطح.',5600);}
   if(S.roofSnow<.3)S.said.rsn=0;
+  const h=X32();
+  if(!h.hole&&S.roofSnow>.55&&S.d>3000&&Math.random()<(.004+w*.05)*dt){h.hole=1;h.hx=[28,118,150,172][Math.floor(Math.random()*4)];alertSay('ثقل الثلج ثقب سقف عربة الفرامل، والدفء يتسرّب. اصعد بالسلّم وأصلح الثقب.',6400);}
+  if(h.hole)S.fuel=Math.max(0,S.fuel-.012*clamp(S.Tf,0,1)*dt);
+  if(S.work!=='rfix')S.rfx=Math.max(0,(S.rfx||0)-dt*1.5);
 }
 function roofWork(dt){
   S.chim=Math.max(0,(S.chim||0)-.11*dt);S.roofSnow=Math.max(0,(S.roofSnow||0)-.11*dt);
@@ -5169,7 +5182,7 @@ function tipTick(dt){
   try{if(FL('hills')){const g=hillG(S.d+250);if(g>.025)tip('hillup','طلعة أمامك: القطار سيبطأ. ارفع الضغط وزد الفحم قبل أن تصل.');else if(g<-.025)tip('hilldn','نزلة أمامك: القطار سيتسارع وحده. خفّف الدفع واستعمل الفرامل قبل المنحنى.');}}catch(e){}
   try{if(FL('bridges')){const br=BRIDGES.find(q=>q.x0>S.d&&q.x0-S.d<1500);if(br)tip('bridge','جسر خشبي هشّ أمامك. اعبره ببطء (أقل من نحو ٩ م/ث) وإلا تشقّق وانهار. إن تشقّق، يمكنك إصلاحه من أمام القطار.');}}catch(e){}
   try{if(FL('av')){const av=AVC.find(q=>q.x>S.d&&q.x-S.d<2600);if(av)tip('av','صوت تشقّق في الجبل: انهيار ثلجي قادم من الخلف. حافظ على سرعتك العالية ولا تتوقف حتى يمرّ.');}}catch(e){}
-  if((S.chim||0)>.35||(S.roofSnow||0)>.4)tip('roof','السقف يحتاج عناية: مدخنة مسدودة أو ثلج ثقيل. اصعد بالسلّم عند العربة الأولى (علامة السقف) وامسح الثلج بالضغط المستمر.');
+  if((S.chim||0)>.35||(S.roofSnow||0)>.4)tip('roof','السقف يحتاج عناية: مدخنة مسدودة أو ثلج ثقيل. اصعد بالسلّم في عربة الفرامل ونظّف الثلج من فوق. الأفضل أن يكون القطار واقفاً، فالريح والحركة تدفعانك وقد تسقط.');
   if(S.v>3)tip('whistle','حبل الصفّارة بجانب المقصورة. اسحبه ليخيف الذئاب وليرد عليك المختبئون في الضباب.');
   if(FL('timectl')&&S.d>2500&&S.v>8)tip('ts','الزر البرتقالي أعلى اليمين يغيّر سرعة الزمن: ×٢ و×٣ للتسريع في الطريق الخالي، و½ لإبطاء اللحظات الحرجة (يستهلك تركيزك). يعود الزمن طبيعياً قرب المحطات والأخطار.');
   if(S.oj&&S.oj.on&&S.v<4.5)tip('oj','اقفز من مقدمة القطار (علامة النزول) والقطار يزحف، ثم امشِ إلى منتصفه واضغط مطوّلاً على العجلة لتكسير الجليد. ارجع إلى السلّم قبل أن يبتعد القطار.');
@@ -5224,7 +5237,7 @@ function tsSet(m){
   const b=document.getElementById('tsBtn');if(b){b.textContent=TSL[m];b.style.background=m===3?'radial-gradient(circle at 35% 30%,#bfe3ff,#2f7fd0)':m?'radial-gradient(circle at 35% 30%,#fff0b0,#ff5a1c)':'radial-gradient(circle at 35% 30%,#ffd28a,#e8791c)';b.style.borderColor=m===3?'#8fc6ff':'#ffb04a';b.style.color=m===3?'#06223d':'#2a1503';}
 }
 function tsDanger(){
-  if(S.modal||S.ground||S.clim||S.hull<35||S.avc||S.oj&&S.oj.on)return 'danger';
+  if(S.modal||S.ground||S.clim||S.roofUp||S.hull<35||S.avc||S.oj&&S.oj.on)return 'danger';
   try{if(hurStr()>.05)return 'storm';}catch(e){}
   const ns=nextStationAhead();if(ns!==null){const dd=ns-(S.d-TENDER_OFF);if(dd>-20&&dd<700)return 'station';}
   const nb=nextBreak();if(nb!==null&&nb-S.d<900&&nb-S.d>-50)return 'break';
@@ -5409,6 +5422,84 @@ function drawOverShell(){}
   document.head.appendChild(st);
 })();
 
+/* ---------- roof access: ladder in the brake car, snow cleaning from above, simple repair, wind + inertia ---------- */
+const ROOF_H=111,ROOF_LO=10,ROOF_HI=182;
+function X32(){S.swc=S.swc||{};return S.swc.x32||(S.swc.x32={hole:0,hx:118});}
+function drawRoofLadder(){
+  const x=60,top=FLOOR-97,up=S.roofUp||(S.clim&&S.clim.kind==='roof');
+  ctx.save();
+  // hatch in the ceiling
+  ctx.fillStyle='#050b12';ctx.fillRect(x-13,top-2,26,5);
+  ctx.fillStyle=up?'rgba(170,215,240,.45)':'#2e465b';
+  if(up){ctx.save();ctx.translate(x+13,top-2);ctx.rotate(-1.05);ctx.fillRect(-26,-3,26,3);ctx.restore();}
+  else ctx.fillRect(x-13,top-3,26,3);
+  // ladder
+  ctx.lineCap='round';ctx.strokeStyle='#7f98aa';ctx.lineWidth=2.6;
+  ctx.beginPath();ctx.moveTo(x-7,FLOOR);ctx.lineTo(x-7,top);ctx.moveTo(x+7,FLOOR);ctx.lineTo(x+7,top);ctx.stroke();
+  ctx.strokeStyle='#aebfca';ctx.lineWidth=2;
+  for(let y=FLOOR-8;y>top;y-=9){ctx.beginPath();ctx.moveTo(x-7,y);ctx.lineTo(x+7,y);ctx.stroke();}
+  ctx.restore();
+}
+function drawRoofStuff(){
+  const sn=S.roofSnow||0,yTop=FLOOR-106,h=X32();
+  // snow mounds that shrink as you shovel
+  if(sn>.04){
+    for(const [mx,k] of [[34,1],[100,.8],[152,1.1]]){
+      const w=10+22*sn*k,hh=2+11*sn*k;
+      ctx.fillStyle='rgba(236,246,252,.95)';ctx.beginPath();ctx.ellipse(mx,yTop-5-sn*12+1,w,hh,0,Math.PI,0);ctx.fill();
+    }
+  }
+  if(h.hole){
+    const hx=h.hx;
+    ctx.fillStyle='#04080d';ctx.fillRect(hx-9,yTop-1,18,11);
+    ctx.fillStyle='#4a6378';ctx.beginPath();ctx.moveTo(hx-11,yTop+1);ctx.lineTo(hx-7,yTop-9);ctx.lineTo(hx-4,yTop+1);ctx.fill();
+    ctx.beginPath();ctx.moveTo(hx+11,yTop+1);ctx.lineTo(hx+6,yTop-8);ctx.lineTo(hx+3,yTop+1);ctx.fill();
+    ctx.fillStyle='rgba(236,246,252,.8)';
+    for(let i=0;i<4;i++){const q=(S.t*.7+i*.25)%1;circ(hx-6+i*4+Math.sin(S.t*3+i)*2,yTop+8+q*60,1.3);ctx.fill();}
+    ctx.save();ctx.globalCompositeOperation='lighter';glow(hx,yTop+14,34,'150,200,235',.12+.05*Math.sin(S.t*4));ctx.restore();
+    if(S.work==='rfix'){const pr=clamp((S.rfx||0)/2,0,1);ctx.fillStyle='rgba(6,13,25,.8)';rr(hx-20,yTop-28,40,6,3);ctx.fill();ctx.fillStyle='#ff8a3d';rr(hx-20,yTop-28,40*pr,6,3);ctx.fill();}
+  }
+}
+function roofNear(){
+  const h=X32();
+  if(h.hole&&Math.abs(S.px-h.hx)<15)return {id:'rfix',x:h.hx,y:FLOOR-110,r:15};
+  if(Math.abs(S.px-60)<9)return {id:'rdown',x:60,y:FLOOR-110,r:9};
+  if((S.roofSnow||0)>.08||(S.chim||0)>.08)return {id:'rclean',x:S.px+(S.face||1)*12,y:FLOOR-110,r:99};
+  return null;
+}
+function roofBody(dt,dirIn,work){
+  const st=S.storm||0,warmF=clamp(S.warm/60,.35,1);
+  const wind=-(S.v*5.5+st*110);          // the wind drags you toward the rear
+  const push=-(S.aS||0)*230;             // acceleration throws you back, braking throws you forward
+  S.slopeAng=0;
+  if(work||S.brkAnim>.25){S.pv=(wind+push)*.05;}
+  else{
+    const brace=dirIn===0;
+    S.pv+=(wind*(brace?.35:1)+push)*dt;
+    S.pv+=(dirIn*70*warmF-S.pv)*(1-Math.exp(-(brace?8:3)*dt));
+    S.pv=clamp(S.pv,-170,170);
+    if(dirIn)S.face=dirIn;else if(Math.abs(S.pv)>30)S.face=Math.sign(S.pv);
+  }
+  if((Math.abs(S.v)>14||st>.4)&&!S.said.rwarn){S.said.rwarn=1;alertSay('الريح والحركة تدفعانك على السطح. تمسّك واقترب من السلّم عند الحاجة.',5200);}
+}
+function roofEdge(){
+  if(S.px>=ROOF_LO&&S.px<=ROOF_HI)return;
+  if(Math.abs(S.v)>4)roofFall();
+  else{S.px=clamp(S.px,ROOF_LO,ROOF_HI);S.pv=0;}
+}
+function roofFall(){
+  const x=S.px;
+  S.roofUp=false;S.ground=true;S.crawl=false;S.gd=S.d-9-(714-x)*TS/PX;S.pv=0;S.brkOn=true;S.thr=0;
+  S.warm=Math.max(0,S.warm-18);S.shake=.6;S.flash=.35;S.chr.sq=.6;
+  tone(90,.35,.2,'sawtooth',50);burst(300,.4,.3,1);
+  say('سقطتَ من السطح! توقّف القطار. امشِ إلى السلّم الأمامي واصعد.',6200);
+}
+function rfixWork(dt){
+  S.rfx=(S.rfx||0)+dt;
+  if(Math.random()<dt*10)S.sparks.push({x:TL+X32().hx,y:FLOOR-106,vx:rnd(-40,40),vy:-rnd(30,90),a:1});
+  if(S.rfx>=2){const h=X32();h.hole=0;S.rfx=0;tone(480,.25,.1);tone(720,.25,.06);burst(500,.4,.2,1);say('رقعتَ الثقب بسهولة. السقف سليم.',3200);}
+}
+
 function flames(x,y,w,h,k){
   const n=5;
   for(let i=0;i<n;i++){
@@ -5440,10 +5531,10 @@ function drawTrain(){
 
   /* brake car */
   interior(6,FLOOR-97,178,97,'#0b1621','#142536',true);
-  roomLight(6,FLOOR-97,178,97,3);
+  roomLight(6,FLOOR-97,178,97,3);drawRoofLadder();
   ctx.save();ctx.globalCompositeOperation='lighter';glow(95,FLOOR-66,125,'255,170,90',.04+.12*heat);ctx.restore();
   ctx.fillStyle='#2b4156';ctx.fillRect(0,FLOOR-106,7,106);ctx.fillRect(184,FLOOR-106,6,50);
-  roof(0,190,11,FLOOR-106);
+  roof(0,190,11,FLOOR-106);drawRoofStuff();
   ctx.strokeStyle='#5e778b';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(95,FLOOR-97);ctx.lineTo(95,FLOOR-86);ctx.stroke();
   ctx.fillStyle='rgba(255,196,120,'+(.35+.5*heat)+')';circ(95,FLOOR-82,4);ctx.fill();
   ctx.save();ctx.globalCompositeOperation='lighter';glow(95,FLOOR-82,36,'255,180,100',.15+.25*heat);ctx.restore();
@@ -5582,7 +5673,7 @@ function charStep(dt,dirIn){
   c.blinkT-=dt;if(c.blinkT<=0){c.blink=.14;c.blinkT=rnd(1.6,4.5);}c.blink=Math.max(0,c.blink-dt);
   c.look+=((S.work==='lever'?S.face:S.face*.6)-c.look)*(1-Math.exp(-6*dt));
   // scarf: verlet chain in world space
-  const ax=TL+S.px,ay=FLOOR-39*CHS-c.sq*-3+(S.clim?S.clim.dy*CHS:0),n=c.sc.length,sh=shelterAt(S.px);
+  const ax=TL+S.px,ay=FLOOR-39*CHS-c.sq*-3+(S.clim?S.clim.dy*CHS:(S.roofUp?-ROOF_H*CHS:0)),n=c.sc.length,sh=shelterAt(S.px);
   if(!c.init){for(let i=0;i<n;i++){c.sc[i].x=c.sc[i].px=ax-S.face*i*3.2;c.sc[i].y=c.sc[i].py=ay+i*1.3;}c.init=1;}
   const wx=-(S.v*34+S.storm*520)*(1-.88*sh)-S.pv*2.6+Math.sin(S.t*9)*40*(1-.8*sh);
   const wy=-Math.abs(Math.sin(S.t*6.3))*60*(1-sh*.8)*S.v*.04+460;
@@ -5624,7 +5715,7 @@ function drawPlayer(){if(window.__noPlayer)return;
   const shiv=cold>0?Math.sin(S.t*55)*cold*1.2:0;
   const breathe=Math.sin(S.t*2.3)*.025;
   drawScarfTail();
-  ctx.save();ctx.translate(TL+S.px+shiv,FLOOR-bob+(S.clim?S.clim.dy:0));ctx.scale(S.face*CHS,CHS);
+  ctx.save();ctx.translate(TL+S.px+shiv,FLOOR-bob+(S.clim?S.clim.dy:(S.roofUp?-ROOF_H:0)));ctx.scale(S.face*CHS,CHS);
   // legs and felt boots
   const cl=S.clim?S.clim.legs:0;
   const l1=sw*.7+cl,l2=-sw*.7-cl;
@@ -5670,7 +5761,7 @@ function drawPlayer(){if(window.__noPlayer)return;
     if(p>.15&&p<.9){ctx.fillStyle='#05090e';ctx.beginPath();ctx.moveTo(0,-5);ctx.lineTo(3,-10);ctx.lineTo(7,-8);ctx.lineTo(10,-10);ctx.lineTo(10.5,-5);ctx.fill();}
     ctx.restore();
   }
-  else if(S.work==='search'||S.work==='gsearch'||S.work==='gwheel'||S.work==='water'||S.work==='leakfix'||S.work==='roof'){
+  else if(S.work==='search'||S.work==='gsearch'||S.work==='gwheel'||S.work==='water'||S.work==='leakfix'||S.work==='roof'||S.work==='rfix'){
     const sg=Math.sin(S.t*8),hx=13+sg*3,hy=-24+Math.abs(sg)*4;
     noodleArm(sx1,sy1,hx,hy,col,2);noodleArm(sx2,sy2,hx-3,hy+3,col,3);
     ctx.strokeStyle='#a8845a';ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(hx,hy);ctx.lineTo(hx+14,hy+9+sg*3);ctx.stroke();
