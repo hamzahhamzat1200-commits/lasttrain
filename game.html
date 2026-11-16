@@ -5036,6 +5036,7 @@ function drawMerchant(){
     ctx.fillStyle='#0c1219';ctx.beginPath();ctx.arc(0,-46,7.5,0,7);ctx.fill();
     ctx.fillStyle='#e4a24a';ctx.beginPath();ctx.arc(-14,-22,3,0,7);ctx.fill();ctx.fillStyle='#0b141d';ctx.fillRect(-15,-34,1.5,12);
     ctx.save();ctx.globalCompositeOperation='lighter';glow(-14,-22,38,'255,170,80',.5);ctx.restore();
+    if(!X6().seen[i])drawArrow(0,-62);
     ctx.restore();
   }
 }
@@ -5077,10 +5078,11 @@ function cameraAct(){
 }
 function drawCamProp(){
   if(!FL('camera'))return;
-  ctx.save();ctx.translate(TL-250,FLOOR-96);
+  ctx.save();ctx.translate(TL-250,FLOOR-28);
   ctx.fillStyle='#0d1822';rr(-9,-6,18,12,2);ctx.fill();ctx.fillStyle='#2b4155';ctx.fillRect(-7,-4,14,3);
   ctx.fillStyle='#0a0f16';ctx.beginPath();ctx.arc(0,1,3.6,0,7);ctx.fill();ctx.fillStyle='rgba(150,200,230,.5)';ctx.beginPath();ctx.arc(-1,0,1,0,7);ctx.fill();
   ctx.strokeStyle='#3b2c1e';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(-6,-6);ctx.quadraticCurveTo(0,-14,6,-6);ctx.stroke();
+  if(!X6().cam)drawArrow(0,-12);
   ctx.restore();
 }
 /* ---------- 9. paper map + album inside the journal ---------- */
@@ -5099,6 +5101,7 @@ function journalExtra2(){
   const A=albumLoad();
   out+='<h3 style="margin:10px 0 4px;font-size:16px">ألبوم الصور ('+A.length+')</h3>';
   out+=A.length?'<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">'+A.slice().reverse().map(p=>'<div style="background:#0c1826;border-radius:6px;padding:4px"><img src="'+p.img+'" style="width:100%;border-radius:4px"><div style="font-size:11px;margin-top:3px">'+p.t+' · كم '+p.km+'</div></div>').join('')+'</div>':'<div class="uc"><p>لا صور بعد. الكاميرا القديمة على جدار العربة الثالثة.</p></div>';
+  out+=guideHtml();
   if(S.endless||S.endLap)out+='<p style="font-size:12px;opacity:.8">اللفة '+((S.endLap|0)+1)+' في سكة بلا نهاية.</p>';
   return out;
 }
@@ -5130,13 +5133,41 @@ function music26(dt){
 let _b3=0;
 function b3Tick(dt){
   extInit();const x=X6();
-  music26(dt);
+  music26(dt);try{tipTick(dt);}catch(e){}
   if(S.modal||mode!=='play'||S.ground||Math.abs(S.v)>.3){_b3=0;return;}
   const st=stationNow();if(st===null){_b3=0;return;}
   const i=stationIndex(st);_b3+=dt;
   if(_b3<2.5)return;
   if(merchAt(i)&&!x.seen[i]){_b3=0;openMerchant(i);return;}
   if(FL('camp')&&S.surv.length&&!x.camp[i]&&S.Tf>.3&&S.warm>25){let nt=false;try{nt=todState().night;}catch(e){}if(nt){_b3=0;openCamp(i);}}
+}
+/* ---------- first-time tips + arrows + quick guide ---------- */
+function tipSeen(id){try{return !!(JSON.parse(localStorage.getItem('lt_tips')||'{}')[id]);}catch(e){return false;}}
+function tipMark(id){try{const t=JSON.parse(localStorage.getItem('lt_tips')||'{}');t[id]=1;localStorage.setItem('lt_tips',JSON.stringify(t));}catch(e){}}
+let _tipCd=0;
+function tip(id,text,ms){if(_tipCd>0||tipSeen(id))return false;tipMark(id);_tipCd=18;try{ding();}catch(e){}say('💡 '+text,ms||7000);return true;}
+function drawArrow(x,y,col){
+  const b=Math.sin(S.t*4)*4;ctx.save();ctx.translate(x,y+b);ctx.fillStyle=col||'#ffc861';ctx.strokeStyle='rgba(0,0,0,.6)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-7,-10);ctx.lineTo(-3,-10);ctx.lineTo(-3,-20);ctx.lineTo(3,-20);ctx.lineTo(3,-10);ctx.lineTo(7,-10);ctx.closePath();ctx.stroke();ctx.fill();ctx.restore();
+}
+function tipTick(dt){
+  if(_tipCd>0)_tipCd-=dt;if(S.modal||mode!=='play'||S.tut)return;
+  const x=X6();
+  if(FL('camera')&&!x.cam&&S.px!==undefined&&Math.abs(S.px+250)<130)tip('cam','الكاميرا القديمة معلّقة على جدار العربة الثالثة (السهم الأصفر). قرّب منها واضغط زر التفاعل لتأخذها، وبعدها كل ضغطة تلتقط صورة تُحفظ في ألبوم دفتر الرحلة.');
+  if(x.shots>=1)tip('album','صورك محفوظة في دفتر الرحلة (زر J أو من القائمة): هناك الألبوم والخريطة الورقية والإنجازات.');
+  const ns=nextStationAhead();
+  if(ns!==null&&FL('trader')){const i=stationIndex(ns),dd=ns-(S.d-TENDER_OFF);if(merchAt(i)&&dd<2500&&dd>300)tip('trader','ضوء فانوس عند المحطة القادمة: تاجر متجوّل. قف عندها (فرملة كاملة) وانتظر ثانيتين ليفتح لك متجره. يشتري منك الخردة ويبيعك فحماً وأفلاماً وأشرطة.');}
+  let nt=false;try{nt=todState().night;}catch(e){}
+  if(nt&&S.surv.length&&FL('camp')&&ns!==null&&ns-(S.d-TENDER_OFF)<2500)tip('camp','بالليل: إذا وقفت في محطة والنار مشتعلة وفي القطار ناجون، يجتمعون حول الفرن ويحكون لك قصصهم. تعطيك السهرة دفئاً.');
+  try{if(FL('hills')){const g=hillG(S.d+250);if(g>.025)tip('hillup','طلعة أمامك: القطار سيبطأ. ارفع الضغط وزد الفحم قبل أن تصل.');else if(g<-.025)tip('hilldn','نزلة أمامك: القطار سيتسارع وحده. خفّف الدفع واستعمل الفرامل قبل المنحنى.');}}catch(e){}
+  try{if(FL('bridges')){const br=BRIDGES.find(q=>q.x0>S.d&&q.x0-S.d<1500);if(br)tip('bridge','جسر خشبي هشّ أمامك. اعبره ببطء (أقل من نحو ٩ م/ث) وإلا تشقّق وانهار. إن تشقّق، يمكنك إصلاحه من أمام القطار.');}}catch(e){}
+  try{if(FL('av')){const av=AVC.find(q=>q.x>S.d&&q.x-S.d<2600);if(av)tip('av','صوت تشقّق في الجبل: انهيار ثلجي قادم من الخلف. حافظ على سرعتك العالية ولا تتوقف حتى يمرّ.');}}catch(e){}
+  if((S.chim||0)>.35||(S.roofSnow||0)>.4)tip('roof','السقف يحتاج عناية: مدخنة مسدودة أو ثلج ثقيل. اصعد بالسلّم عند العربة الأولى (علامة السقف) وامسح الثلج بالضغط المستمر.');
+  if(S.v>3)tip('whistle','حبل الصفّارة بجانب المقصورة. اسحبه ليخيف الذئاب وليرد عليك المختبئون في الضباب.');
+  if(S.d>20000)tip('journal','افتح دفتر الرحلة (J) كل فترة: فيه الخريطة والألبوم والإنجازات والأشرطة.');
+}
+function guideHtml(){
+  return '<h3 style="margin:10px 0 4px;font-size:16px">دليل سريع</h3><div class="uc"><p>• <b>الحركة:</b> تحرّك داخل القطار وقرّب من أي جهاز، ويظهر اسمه في الأسفل؛ اضغط زر التفاعل.<br>• <b>الفرن والفحم:</b> خذ الفحم من الكومة وارمِه في الفرن. راقب عدّادَي الحرارة والضغط.<br>• <b>الفرامل:</b> على الجدار الأيمن للمقصورة. توقّف في المحطات لجمع الغنائم.<br>• <b>الكاميرا:</b> العربة الثالثة، السهم الأصفر. صورك في هذا الدفتر.<br>• <b>التاجر:</b> فانوس عند بعض المحطات. قف وانتظر ثانيتين.<br>• <b>السهرات:</b> ليلاً في المحطات إذا كان معك ناجون والنار مشتعلة.<br>• <b>الصفّارة:</b> الحبل الصغير في المقصورة.<br>• <b>سكة بلا نهاية:</b> تنفتح بعد أول وصول، من القائمة الرئيسية.</p></div>';
 }
 window.__b3={cameraAct,endlessLap,journalExtra2,startEndless,openMerchant,openCamp};
 
