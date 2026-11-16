@@ -1934,17 +1934,19 @@ addEventListener('keydown',e=>{if(e.code==='Equal'||e.code==='NumpadAdd'){zoomBy
 function drawCabBrake(){if(window.__emptyCab)return;
   ctx.save();ctx.translate(TL,0);
   const x=525,by=FLOOR-6,KA=.6,ang=(-.35+S.brkLv*1.15)*KA;
-  // cast housing with hazard stripes
-  ctx.fillStyle='#1d2d3c';ctx.beginPath();ctx.moveTo(x-11,by+6);ctx.lineTo(x-8,by-7);ctx.lineTo(x+8,by-7);ctx.lineTo(x+11,by+6);ctx.closePath();ctx.fill();
-  ctx.save();ctx.clip();for(let i=-3;i<5;i++){ctx.fillStyle=i%2?'#e0b040':'#1a232d';ctx.beginPath();ctx.moveTo(x-12+i*5,by+6);ctx.lineTo(x-7+i*5,by+6);ctx.lineTo(x-2+i*5,by-7);ctx.lineTo(x-7+i*5,by-7);ctx.fill();}ctx.restore();
-  // short notched quadrant: release / apply
-  ctx.strokeStyle='#8fa5b5';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(x,by-2,32,-Math.PI/2-.35*KA,-Math.PI/2+.8*KA);ctx.stroke();
+  // dark iron housing with brass top strip and rivets
+  ctx.fillStyle='#2a2018';rr(x-11,by-7,22,13,2);ctx.fill();
+  ctx.fillStyle='#c9953f';ctx.fillRect(x-11,by-8,22,2.6);
+  ctx.fillStyle='#f0cd86';circ(x-8,by+2,1.2);ctx.fill();circ(x+8,by+2,1.2);ctx.fill();
+  // brass quadrant: release / apply
+  ctx.strokeStyle='#c9953f';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(x,by-2,32,-Math.PI/2-.35*KA,-Math.PI/2+.8*KA);ctx.stroke();
   for(let k=0;k<=4;k++){const t=(-.35+k*.2875)*KA,px=x+Math.sin(t)*32,py=by-2-Math.cos(t)*32;ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(px+Math.sin(t)*4,py-Math.cos(t)*4);ctx.stroke();}
-  // handle: iron shaft with a D-ring grip (unlike the round throttle knob)
+  // handle: iron shaft, brass collar, wooden T-grip
   ctx.save();ctx.translate(x,by-2);ctx.rotate(ang);ctx.scale(.74,.74);
-  ctx.fillStyle='#4a525a';rr(-2.6,-36,5.2,36,2);ctx.fill();
-  ctx.fillStyle='#2e353c';ctx.fillRect(-2.6,-26,5.2,2);ctx.fillRect(-2.6,-16,5.2,2);
-  ctx.strokeStyle=S.brkOn?'#ff5a46':'#c9d6df';ctx.lineWidth=3.6;ctx.beginPath();ctx.moveTo(-9,-36);ctx.lineTo(9,-36);ctx.lineTo(9,-48);ctx.quadraticCurveTo(0,-55,-9,-48);ctx.closePath();ctx.stroke();
+  ctx.fillStyle='#3a3a3e';rr(-2.8,-40,5.6,40,2);ctx.fill();
+  ctx.fillStyle='#c9953f';rr(-4.6,-34,9.2,8,2);ctx.fill();
+  ctx.fillStyle=S.brkOn?'#a8442f':'#7a4c28';rr(-19,-52,38,13,6);ctx.fill();
+  ctx.fillStyle='rgba(255,230,190,.3)';rr(-15,-49,30,3.6,2);ctx.fill();
   ctx.restore();
   ctx.fillStyle='#d6e4ed';circ(x,by-2,3);ctx.fill();
   leverBand();
@@ -1957,7 +1959,7 @@ function leverBand(){
   const cx=572,cy=FLOOR-10,r=36,d2r=Math.PI/180,A=a=>(a-90)*d2r;
   const aR=leverAng(-.5),aZ0=leverAng(-.07),aZ1=leverAng(.07),aF=leverAng(1);
   const st=S.thr<-.07?'r':S.thr>.07?'g':'y';
-  ctx.save();ctx.lineCap='butt';ctx.lineWidth=5;
+  ctx.save();ctx.lineCap='round';ctx.lineWidth=3.2;
   const seg=(a0,a1,col,on)=>{ctx.strokeStyle=col;ctx.globalAlpha=on?1:.38;ctx.beginPath();ctx.arc(cx,cy,r,A(a0),A(a1));ctx.stroke();};
   seg(aR,aZ0,'#e0483c',st==='r');seg(aZ0,aZ1,'#f2c230',st==='y');seg(aZ1,aF,'#46c46a',st==='g');
   ctx.globalAlpha=1;
@@ -4703,9 +4705,9 @@ function hidGen(R,ur){
 function drawWhistle(){if(window.__emptyCab)return;
   ctx.save();ctx.translate(TL,0);
   const x=476,y=FLOOR-104;
-  ctx.fillStyle='#b78b3e';rr(x-4,y-8,8,9,2);ctx.fill();ctx.fillStyle='#d9b062';ctx.fillRect(x-3,y-7,2,7);
+  ctx.fillStyle='#d98b1c';ctx.beginPath();ctx.moveTo(x-5,y+1);ctx.lineTo(x-2.8,y-8);ctx.lineTo(x+2.8,y-8);ctx.lineTo(x+5,y+1);ctx.closePath();ctx.fill();ctx.strokeStyle='#4a2a08';ctx.lineWidth=.8;ctx.stroke();
   ctx.strokeStyle='#9aa8b3';ctx.lineWidth=1.1;ctx.setLineDash([2,1.6]);ctx.beginPath();ctx.moveTo(x,y+1);ctx.lineTo(x+(S.whT>0?Math.sin(S.t*30)*1.6:0),y+18);ctx.stroke();ctx.setLineDash([]);
-  ctx.fillStyle='#b78b3e';circ(x,y+19,2.2);ctx.fill();
+  ctx.fillStyle='#c0392b';circ(x,y+19,2.6);ctx.fill();
   if(S.whT>0){const k=S.whT/1.6;
     ctx.save();ctx.globalCompositeOperation='lighter';
     for(let i=0;i<7;i++){const a=(1-k)+i*.09,r=3+a*22,yy=y-6-a*34;ctx.fillStyle='rgba(235,245,252,'+(.17*Math.max(0,1-a))+')';circ(x+a*8,yy,r);ctx.fill();}
@@ -5602,7 +5604,7 @@ function drawTrain(){
   ctx.fillStyle='#2b4156';ctx.fillRect(0,FLOOR-106,7,106);ctx.fillRect(184,FLOOR-106,6,50);
   roof(0,190,11,FLOOR-106);drawRoofStuff();
   ctx.strokeStyle='#5e778b';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(95,FLOOR-97);ctx.lineTo(95,FLOOR-86);ctx.stroke();
-  ctx.fillStyle='rgba(255,196,120,'+(.35+.5*heat)+')';circ(95,FLOOR-82,4);ctx.fill();
+  ctx.fillStyle='rgba(228,238,245,.92)';ctx.beginPath();ctx.ellipse(95,FLOOR-85,10,2.8,0,0,6.2832);ctx.fill();ctx.fillStyle='rgba(255,226,160,'+(.35+.5*heat)+')';ctx.beginPath();ctx.ellipse(95,FLOOR-82.6,7,1.7,0,0,6.2832);ctx.fill();
   ctx.save();ctx.globalCompositeOperation='lighter';glow(95,FLOOR-82,36,'255,180,100',.15+.25*heat);ctx.restore();
   ctx.fillStyle='#22374b';ctx.fillRect(122,FLOOR-28,62,5);ctx.fillRect(122,FLOOR-28,4,28);ctx.fillRect(180,FLOOR-28,4,28);
   ctx.fillStyle='#6b8aa2';rr(126,FLOOR-39,52,11,5);ctx.fill();ctx.fillStyle='#8fb0c6';rr(128,FLOOR-43,16,8,4);ctx.fill();
@@ -5633,25 +5635,28 @@ function drawTrain(){
   roof(390,602,41,FLOOR-114);
 
   if(!window.__emptyCab){
-  // furnace
-  ctx.fillStyle=lin(0,FLOOR-56,0,FLOOR,[[0,'#2a3d50'],[1,'#162433']]);rr(406,FLOOR-56,54,56,4);ctx.fill();
-  ctx.strokeStyle='#4d6578';ctx.lineWidth=1.2;ctx.stroke();
-  ctx.fillStyle='#17283a';ctx.fillRect(424,FLOOR-110,12,56);
-  ctx.fillStyle='#04080d';rr(418,FLOOR-40,30,30,3);ctx.fill();
-  ctx.save();rr(418,FLOOR-40,30,30,3);ctx.clip();
+  // furnace: cast iron body, brass trim, arched door
+  ctx.fillStyle=lin(406,0,460,0,[[0,'#1a1a1c'],[.5,'#3a3a3e'],[1,'#141416']]);rr(406,FLOOR-56,54,56,5);ctx.fill();
+  ctx.strokeStyle='#caa24e';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle='#2a2a2e';ctx.fillRect(424,FLOOR-110,12,56);ctx.fillStyle='#caa24e';ctx.fillRect(422,FLOOR-58,16,3);
+  for(const [rx,ry] of [[410,FLOOR-52],[456,FLOOR-52],[410,FLOOR-4],[456,FLOOR-4]]){ctx.fillStyle='#caa24e';circ(rx,ry,1.3);ctx.fill();}
+  const arch=()=>{ctx.beginPath();ctx.moveTo(418,FLOOR-8);ctx.lineTo(418,FLOOR-27);ctx.quadraticCurveTo(433,FLOOR-47,448,FLOOR-27);ctx.lineTo(448,FLOOR-8);ctx.closePath();};
+  ctx.fillStyle='#04080d';arch();ctx.fill();
+  ctx.save();arch();ctx.clip();
   const fl=.85+.15*Math.sin(S.t*17);
   ctx.fillStyle='rgba(255,'+(70+Math.round(120*heat))+',30,'+((.12+.88*heat)*fl)+')';ctx.fillRect(418,FLOOR-14,30,10);
-  flames(418,FLOOR-14,30,26,heat);
+  flames(418,FLOOR-12,30,28,heat);
   ctx.restore();
   if(S.doorOpen>0){
-    ctx.fillStyle='#2a3d50';ctx.beginPath();ctx.moveTo(448,FLOOR-40);ctx.lineTo(462,FLOOR-36);ctx.lineTo(462,FLOOR-14);ctx.lineTo(448,FLOOR-10);ctx.closePath();ctx.fill();
-    ctx.strokeStyle='#6d8497';ctx.lineWidth=1;ctx.stroke();
+    ctx.fillStyle='#2a2a2e';ctx.beginPath();ctx.moveTo(448,FLOOR-40);ctx.lineTo(462,FLOOR-36);ctx.lineTo(462,FLOOR-14);ctx.lineTo(448,FLOOR-10);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='#caa24e';ctx.lineWidth=1.2;ctx.stroke();
     ctx.save();ctx.globalCompositeOperation='lighter';glow(433,FLOOR-24,70,'255,150,60',.5);ctx.restore();
   }else{
-    ctx.fillStyle='#1b2c3d';rr(418,FLOOR-40,30,30,3);ctx.globalAlpha=.9;ctx.fill();ctx.globalAlpha=1;
-    for(let k=0;k<3;k++){ctx.fillStyle='rgba(255,'+(90+Math.round(80*heat))+',40,'+(.15+.85*heat*fl)+')';ctx.fillRect(423,FLOOR-34+k*7,20,2.4);}
-    ctx.fillStyle='#8aa2b3';ctx.fillRect(446,FLOOR-26,3,6);
+    ctx.fillStyle='#1d1d20';arch();ctx.globalAlpha=.9;ctx.fill();ctx.globalAlpha=1;
+    ctx.save();arch();ctx.clip();for(let k=0;k<3;k++){ctx.fillStyle='rgba(255,'+(90+Math.round(80*heat))+',40,'+(.15+.85*heat*fl)+')';ctx.fillRect(423,FLOOR-28+k*7,20,2.4);}ctx.restore();
+    ctx.fillStyle='#f0cd86';circ(445,FLOOR-22,2.4);ctx.fill();
   }
+  ctx.strokeStyle='#caa24e';ctx.lineWidth=1.8;arch();ctx.stroke();
   ctx.save();ctx.globalCompositeOperation='lighter';glow(433,FLOOR-24,44,'255,120,40',.3*heat*fl);ctx.restore();
 
   // instruments panel: [speed] [whistle] [pressure] [temp] [water] [map]
@@ -5672,14 +5677,13 @@ function drawTrain(){
   ctx.save();ctx.translate(405,FLOOR-103);
   ctx.strokeStyle='#5e778b';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,7);ctx.stroke();
   ctx.rotate(S.bell*.55*Math.sin(S.t*14));
-  ctx.fillStyle=S.bell>.05?'#f2c26b':'#b98b3e';ctx.beginPath();ctx.moveTo(-5.5,15);ctx.quadraticCurveTo(-5.5,7,0,7);ctx.quadraticCurveTo(5.5,7,5.5,15);ctx.closePath();ctx.fill();
-  ctx.fillStyle='#3a2a10';circ(0,16,1.6);ctx.fill();ctx.restore();
+  ctx.fillStyle=S.bell>.05?'#e8584a':'#c0392b';circ(0,15,8);ctx.fill();ctx.strokeStyle='#4a1510';ctx.lineWidth=1;ctx.stroke();ctx.fillStyle='#e8e3cf';circ(0,15,3.2);ctx.fill();ctx.strokeStyle='#4a1510';ctx.lineWidth=.8;ctx.stroke();ctx.fillStyle='#e8e3cf';ctx.fillRect(-6,22.5,12,2.6);ctx.restore();
 
   // throttle lever (pivot 572, short throw)
-  ctx.fillStyle='#31475b';rr(556,FLOOR-10,32,10,3);ctx.fill();
+  ctx.strokeStyle='#e4eef5';ctx.lineWidth=2.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(556,FLOOR-2);ctx.lineTo(588,FLOOR-2);ctx.stroke();
   const la=leverAng(S.thr)*Math.PI/180,lx=572+Math.sin(la)*32,ly=FLOOR-10-Math.cos(la)*32;
-  ctx.strokeStyle='#c4d4df';ctx.lineWidth=3.6;ctx.beginPath();ctx.moveTo(572,FLOOR-10);ctx.lineTo(lx,ly);ctx.stroke();
-  ctx.fillStyle=S.work==='lever'?'#ffd0a0':'#ff8a3d';circ(lx,ly,4.6);ctx.fill();
+  ctx.strokeStyle='#e4eef5';ctx.lineWidth=2.6;ctx.beginPath();ctx.moveTo(572,FLOOR-2);ctx.lineTo(572,FLOOR-10);ctx.lineTo(lx,ly);ctx.stroke();
+  ctx.save();ctx.translate(lx,ly);ctx.rotate(la);ctx.fillStyle=S.work==='lever'?'#ffe0b0':'#ffb04a';rr(-6.5,-3.4,13,6.8,3.4);ctx.fill();ctx.restore();
   cabTxt('خانق القدرة',574,FLOOR-55,5.4);cabTxt('مكبح',496,FLOOR-47,5.4);cabTxt('الفرن',432,FLOOR-50,5.4);cabTxt('الثلج',500,FLOOR-12,4.6);
 
   }
