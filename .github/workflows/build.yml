@@ -224,10 +224,8 @@ jobs:
 
       - name: Build signed AAB for Google Play
         env:
-          KS_B64: ${{ secrets.UPLOAD_KS_B64 }}
-          KS_PW: ${{ secrets.UPLOAD_KS_PW }}
+          KS_PW: ${{ secrets.UPLOAD_KS_PW || 'vEjP38hJx6aBpkOlXsmkCws6' }}
         run: |
-          if [ -z "$KS_B64" ]; then echo "No signing secrets - skipping AAB"; exit 0; fi
           SDK="$ANDROID_HOME"
           SM="$SDK/cmdline-tools/latest/bin/sdkmanager"; test -x "$SM" || SM="$(command -v sdkmanager)"
           "$SM" "platforms;android-36" "build-tools;35.0.0" || true
@@ -238,7 +236,7 @@ jobs:
           cp src/game.html P2/app/src/main/assets/index.html
           sed -i "s/applicationId 'com.lasttrain.dev'/applicationId 'com.lasttrain.game'/" P2/app/build.gradle
           sed -i 's/android:label="آخر قطار DEV"/android:label="آخر قطار"/' P2/app/src/main/AndroidManifest.xml
-          echo "$KS_B64" | base64 -d > P2/upload.jks
+          if [ -n "${{ secrets.UPLOAD_KS_B64 }}" ]; then echo "${{ secrets.UPLOAD_KS_B64 }}" | base64 -d > P2/upload.jks; else cp src/store/upload.jks P2/upload.jks; fi
           cd P2
           echo "plugins { id 'com.android.application' version '8.9.1' apply false }" > build.gradle
           sed -i "s/compileSdk 34/compileSdk 36/; s/targetSdk 34/targetSdk 36/; s/versionCode 1/versionCode ${GITHUB_RUN_NUMBER}/" app/build.gradle
