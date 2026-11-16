@@ -462,6 +462,7 @@ function groundNear(){
   for(let i=0;i<WRECKS.length;i++){const w=WRECKS[i];if(!S.done['w'+i]&&Math.abs(S.gd-w.x)<8)return {id:'gsearch',x,y,r:99,site:{type:'wreck',w,i}};}
   for(const st of STORIES){if(!S.told[st.i]&&Math.abs(S.gd-st.x)<10)return {id:'gstory',x,y,r:99,st};}
   if(!S.carry)for(const c of CRATES){if((S.crateTaken[c.x]||0)<c.n&&Math.abs(S.gd-c.x)<5)return {id:'gcrate',x,y,r:99,c};}
+  if(S.oj&&S.oj.on&&Math.abs(S.gd-(S.d-90))<7)return {id:'gwheel',x,y,r:99};
   if(Math.abs(S.gd-(S.d-9))<4.5)return {id:'gup',x,y,r:99};
   return null;
 }
@@ -469,13 +470,14 @@ function promptFor(t){
   if(!t)return null;
   const nb=nextBreak(),blocked=nb!==null&&nb-S.d<repairReach()&&Math.abs(S.v)<.5;
   switch(t.id){
+    case 'gwheel':return {l:'كسّر الجليد عن العجلة',hold:1};
     case 'gcrate':return {l:'احمل جذع حطب ('+(t.c.n-(S.crateTaken[t.c.x]||0))+' متبقٍ)'};
     case 'cargo':return {l:'احمل الجذع ('+Math.round(S.cargo[t.idx]?S.cargo[t.idx].n:0)+')'};
     case 'coal':if(S.carry&&S.ck==='crate')return {l:'ضع الحطب في المخزن ('+Math.round(S.crateN)+')'};return S.carry?null:(S.coalPile>0?{l:'خذ فحماً'}:{l:'الكومة فارغة',dead:true});
     case 'load':return stationNow()?{l:'جرف الفحم',hold:1}:null;
     case 'furnace':if(S.carry&&S.ck==='crate')return {l:'ارمِ قطعة حطب في الفرن ('+Math.round(S.crateN)+')'};return S.carry&&S.ck!=='crate'?{l:S.ck==='coal'?'ارمِ الفحم':'احرق ال'+ITEM_AR[S.ck]}:null;
     case 'item':return S.carry?null:{l:'خذ ال'+ITEM_AR[ITEMS[t.idx].k]};
-    case 'climbdown':return Math.abs(S.v)<.5?{l:'اقفز إلى الأرض'}:{l:'أوقف القطار أولاً'};
+    case 'climbdown':return Math.abs(S.v)<.5?{l:'اقفز إلى الأرض'}:(S.oj&&S.oj.on&&Math.abs(S.v)<4?{l:'اقفز والقطار يزحف'}:{l:'أوقف القطار أولاً'});
     case 'gclear':return {l:['أزل العمود الساقط','حطّم كتلة الجليد','أزح الصخرة المتجمدة'][t.b.k],hold:1};
     case 'gup':return {l:'اصعد السلم'};
     case 'grepair':return {l:'أصلح السكة',hold:1};
@@ -680,8 +682,9 @@ function update(dt){
         if(pressed&&!blocked&&site&&site.type==='story'){openStory(site.st);return;}
         break;
       case 'load':if(act&&st)work='load';break;
-      case 'climbdown':if(pressed&&Math.abs(S.v)<.5){S.brkOn=true;S.clim={dir:1,t:0,dy:0,legs:0};S.thr=0;S.face=1;S.pv=0;S.px=714;tone(260,.12,.08);say('قفزتَ من مقدمة القطار. المكبح سُحب تلقائياً.',3000);}break;
-      case 'gup':if(pressed){S.px=714;S.ground=false;S.pv=0;S.face=1;S.clim={dir:-1,t:0,dy:37,legs:0};tone(300,.12,.08);}break;
+      case 'climbdown':if(pressed&&(Math.abs(S.v)<.5||(S.oj&&S.oj.on&&Math.abs(S.v)<4))){S.crawl=Math.abs(S.v)>=.5;S.brkOn=true;S.clim={dir:1,t:0,dy:0,legs:0};S.thr=0;S.face=1;S.pv=0;S.px=714;tone(260,.12,.08);say('قفزتَ من مقدمة القطار. المكبح سُحب تلقائياً.',3000);}break;
+      case 'gwheel':if(act)work='gwheel';break;
+      case 'gup':if(pressed){S.crawl=false;S.px=714;S.ground=false;S.pv=0;S.face=1;S.clim={dir:-1,t:0,dy:37,legs:0};tone(300,.12,.08);}break;
       case 'grepair':if(act)work='grepair';break;
       case 'gclear':if(act)work='gclear';break;
       case 'gsearch':if(act)work='gsearch';break;
@@ -699,7 +702,7 @@ function update(dt){
       if((t0>0&&S.thr<=0&&dirIn<0)||(t0<0&&S.thr>=0&&dirIn>0)||(t0*S.thr<0)){S.thr=0;S.detT=.5;tone(200,.1,.1,'square');}}
     if(Math.floor(S.thr*8)!==n0){tone(260,.05,.06,'square');burst(1500,.04,.06,3);}
   }
-  if(S.ground){S.thr=0;S.brkOn=true;}
+  if(S.ground){if(S.crawl){S.brkOn=false;S.thr=clamp((3-S.v)*.25,0,.5);}else{S.thr=0;S.brkOn=true;}}
   if(inp.dropHit){inp.dropHit=false;dropCrate();}
   if(inp.doorHit){inp.doorHit=false;if(!S.ground&&!S.clim){if(S.px>520&&S.px<700)toggleDoor();else say('اقترب من الباب عند مقدمة المقصورة ثم اضغط F.',2600);}}
   if(inp.brkHit){inp.brkHit=false;if(!S.ground){if(S.px>470&&S.px<650)toggleBrake();else say('اقترب من ذراع المكبح الأحمر في المقصورة ثم اضغط S.',2800);}}
@@ -723,6 +726,7 @@ function update(dt){
   if(work==='roof')roofWork(dt);
   if(work==='leakfix'){S.leakFix+=dt;if(Math.random()<.3)burst(1800,.05,.08,3);if(S.leakFix>=3){S.leak=false;S.leakFix=0;tone(520,.25,.09);say('سددتَ التسريب.',2600);}}
   else S.leakFix=Math.max(0,S.leakFix-dt);
+  if(work==='gwheel')ojWork(dt);
   const wsite=work==='gsearch'?near.site:site;
   if((work==='search'||work==='gsearch')&&wsite&&wsite.type==='wreck'){const site=wsite;S.loot+=dt;
     if(Math.random()<.2)burst(900,.05,.07,2);
@@ -5133,7 +5137,7 @@ function music26(dt){
 let _b3=0;
 function b3Tick(dt){
   extInit();const x=X6();
-  music26(dt);try{tipTick(dt);}catch(e){}
+  music26(dt);try{tipTick(dt);ojTick(dt);tsTick(dt);}catch(e){}
   if(S.modal||mode!=='play'||S.ground||Math.abs(S.v)>.3){_b3=0;return;}
   const st=stationNow();if(st===null){_b3=0;return;}
   const i=stationIndex(st);_b3+=dt;
@@ -5164,12 +5168,89 @@ function tipTick(dt){
   try{if(FL('av')){const av=AVC.find(q=>q.x>S.d&&q.x-S.d<2600);if(av)tip('av','صوت تشقّق في الجبل: انهيار ثلجي قادم من الخلف. حافظ على سرعتك العالية ولا تتوقف حتى يمرّ.');}}catch(e){}
   if((S.chim||0)>.35||(S.roofSnow||0)>.4)tip('roof','السقف يحتاج عناية: مدخنة مسدودة أو ثلج ثقيل. اصعد بالسلّم عند العربة الأولى (علامة السقف) وامسح الثلج بالضغط المستمر.');
   if(S.v>3)tip('whistle','حبل الصفّارة بجانب المقصورة. اسحبه ليخيف الذئاب وليرد عليك المختبئون في الضباب.');
+  if(FL('timectl')&&S.d>2500&&S.v>8)tip('ts','الزر الدائري في وسط الشاشة (أو مفتاح T) يغيّر سرعة الزمن: ×٢ و×٣ للتسريع في الطريق الخالي، و½ لإبطاء اللحظات الحرجة (يستهلك تركيزك). يعود الزمن طبيعياً قرب المحطات والأخطار.');
+  if(S.oj&&S.oj.on&&S.v<4.5)tip('oj','اقفز من مقدمة القطار (علامة النزول) والقطار يزحف، ثم امشِ إلى منتصفه واضغط مطوّلاً على العجلة لتكسير الجليد. ارجع إلى السلّم قبل أن يبتعد القطار.');
   if(S.d>20000)tip('journal','افتح دفتر الرحلة (J) كل فترة: فيه الخريطة والألبوم والإنجازات والأشرطة.');
 }
 function guideHtml(){
   return '<h3 style="margin:10px 0 4px;font-size:16px">دليل سريع</h3><div class="uc"><p>• <b>الحركة:</b> تحرّك داخل القطار وقرّب من أي جهاز، ويظهر اسمه في الأسفل؛ اضغط زر التفاعل.<br>• <b>الفرن والفحم:</b> خذ الفحم من الكومة وارمِه في الفرن. راقب عدّادَي الحرارة والضغط.<br>• <b>الفرامل:</b> على الجدار الأيمن للمقصورة. توقّف في المحطات لجمع الغنائم.<br>• <b>الكاميرا:</b> العربة الثالثة، السهم الأصفر. صورك في هذا الدفتر.<br>• <b>التاجر:</b> فانوس عند بعض المحطات. قف وانتظر ثانيتين.<br>• <b>السهرات:</b> ليلاً في المحطات إذا كان معك ناجون والنار مشتعلة.<br>• <b>الصفّارة:</b> الحبل الصغير في المقصورة.<br>• <b>سكة بلا نهاية:</b> تنفتح بعد أول وصول، من القائمة الرئيسية.</p></div>';
 }
 window.__b3={cameraAct,endlessLap,journalExtra2,startEndless,openMerchant,openCamp};
+
+/* ====== outside jobs while the train crawls + time control ====== */
+ACH.push({id:'wheel3',t:'يد الحدّاد',d:'فكّ العجلة من الجليد وهي تتحرّك ثلاث مرات.'});
+let OJ=null;
+function ojGen(){
+  const R=mulberry((S.seed||7)*13+5);OJ={seed:S.seed,list:[]};let d=13000+R()*3000;
+  while(d<GOAL-9000){OJ.list.push({x:Math.round(d)});d+=11000+R()*7000;}
+}
+function ojTick(dt){
+  if(!FL('outjob'))return;
+  if(!OJ||OJ.seed!==S.seed)ojGen();
+  if(!S.oj){
+    for(const j of OJ.list){if(S.swc['oj'+j.x])continue;if(S.d>j.x-300&&S.d<j.x+300&&!S.modal){S.oj={x:j.x,on:true,p:0,t:0};break;}}
+    if(S.oj)alertSay('جليدٌ يشدّ إحدى العجلات! خفّف السرعة تحت ٤ م/ث، ثم اقفز من مقدمة القطار وكسّر الجليد عن العجلة، والقطار يزحف.',8000);
+    return;
+  }
+  const o=S.oj;o.t+=dt;
+  if(o.on){
+    S.wheelHeat=Math.min(1,(S.wheelHeat||0)+dt*.02);
+    if(S.v>9)S.v=Math.max(9,S.v-dt*3);
+    if(o.t>35&&!S.ground)S.hull=Math.max(1,S.hull-dt*.12);
+    if(o.t>60&&!o.said){o.said=1;say('العجلة ما زالت عالقة وتصرّ بشدّة. الهيكل يتضرّر.',5200);}
+    if(S.ground&&S.crawl&&S.v>3.6)S.v=3.6;
+    // keep the worker attached to the wheel while chipping the ice
+    if(S.work==='gwheel'&&S.ground)S.gd+=S.v*dt;
+  }
+  if(!S.ground&&S.crawl)S.crawl=false;
+  if(o.t>200||S.d>o.x+1800||S.d<o.x-900){S.oj=null;}
+}
+function ojWork(dt){
+  const o=S.oj;if(!o||!o.on)return;
+  o.p+=dt/3.4;
+  if(Math.random()<dt*14){S.spray.push({x:TL+130+rnd(-30,30),y:GY-6,vx:rnd(-40,40),vy:rnd(-80,-20),a:.9,r:rnd(1,2.2)});}
+  if(Math.floor(o.p*8)!==o._k){o._k=Math.floor(o.p*8);burst(1500,.04,.06,5);}
+  if(o.p>=1){o.on=false;S.swc['oj'+o.x]=1;S.wheelHeat=0;S.scrap+=3;S.hull=Math.min(100,S.hull+4);S.ojN=(S.ojN||0)+1;
+    tone(620,.15,.07);say('انفكّت العجلة. التقطتَ بضع قطع حديد من الجليد.',4800);if(S.ojN>=3)ach('wheel3');S.oj=null;}
+}
+/* ---------- time control ---------- */
+window.__tsN=1;window.__tsS=1;let TSM=0,FOC=100,_tsMsg=0;
+const TSL=['×١','×٢','×٣','½'];
+function tsSet(m){
+  TSM=m;window.__tsN=m===1?2:m===2?3:1;window.__tsS=m===3?.5:1;
+  const b=document.getElementById('tsBtn');if(b){b.textContent=TSL[m];b.style.background=m?'rgba(255,170,70,.9)':'rgba(20,34,50,.75)';b.style.color=m?'#1a1208':'#cfe0ee';}
+}
+function tsDanger(){
+  if(S.modal||S.ground||S.clim||S.hull<35||S.avc||S.oj&&S.oj.on)return 'danger';
+  try{if(hurStr()>.05)return 'storm';}catch(e){}
+  const ns=nextStationAhead();if(ns!==null){const dd=ns-(S.d-TENDER_OFF);if(dd>-20&&dd<700)return 'station';}
+  const nb=nextBreak();if(nb!==null&&nb-S.d<900&&nb-S.d>-50)return 'break';
+  return null;
+}
+function tsTick(dt){
+  if(TSM===0){FOC=Math.min(100,FOC+dt*4);return;}
+  const dg=tsDanger();
+  if(TSM===3){FOC-=dt*10*(window.__tsS||1)*.5;if(FOC<=0){FOC=0;tsSet(0);say('انتهى تركيزك. عاد الزمن لطبيعته.',3600);return;}}
+  else if(dg&&TSM>0){tsSet(0);if(!_tsMsg||S.t-_tsMsg>12){_tsMsg=S.t;say(dg==='station'?'محطة قريبة: عاد الزمن لطبيعته.':dg==='break'?'سكة مقطوعة قريبة: عاد الزمن لطبيعته.':'خطر: عاد الزمن لطبيعته.',3800);}}
+}
+function tsCycle(){
+  if(mode!=='play'||!FL('timectl'))return;
+  const dg=tsDanger();let n=(TSM+1)%4;
+  if(n!==0&&n!==3&&dg){say('لا يمكن تسريع الزمن الآن.',2800);return;}
+  if(n===3&&FOC<25){say('تركيزك منخفض. انتظر قليلاً.',3000);n=0;}
+  tsSet(n);
+}
+(function(){
+  try{
+    const t=document.getElementById('touch');if(!t)return;
+    const b=document.createElement('button');b.id='tsBtn';b.type='button';b.textContent='×١';
+    b.style.cssText='position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:46px;height:46px;border-radius:50%;border:1px solid rgba(160,200,230,.4);background:rgba(20,34,50,.75);color:#cfe0ee;font:700 15px system-ui;z-index:5;touch-action:manipulation';
+    b.addEventListener('click',tsCycle);t.appendChild(b);
+    window.addEventListener('keydown',e=>{if(e.key==='t'||e.key==='T')tsCycle();});
+  }catch(e){}
+})();
+function tsReset(){tsSet(0);}
+window.__b4={tsDanger,ojTick,tsCycle,tsSet,get oj(){return S.oj;},get list(){return OJ&&OJ.list;}};
 
 /* ===== DEVELOPER BUILD ONLY: test panel ===== */
 (function(){
@@ -5188,7 +5269,7 @@ window.__b3={cameraAct,endlessLap,journalExtra2,startEndless,openMerchant,openCa
   function build(){
     p.innerHTML='';
     H('ميزات (أخضر = شغّالة)');
-    const FEATS=[['surv','الناجون'],['switch','مفترقات السكة'],['wolves','ذئاب الليل'],['tapes','أشرطة سلمى'],['towers','أبراج المياه'],['marks','المعالم'],['tod','ليل ونهار'],['bio','تغيّر المناظر'],['amb','شفق متغيّر'],['events','أحداث عشوائية'],['hur','الأعاصير'],['zones','المناطق الخطرة'],['depth','عمق وأشجار قريبة'],['bloom','توهج'],['grain','حبيبات'],['gov','ضبط الجودة تلقائي'],['lamp','ضوء الغرف'],['d3','عمق 3D'],['hills','المنحدرات'],['bridges','الجسور الهشّة'],['av','الانهيار الثلجي'],['roof','شغلات السقف'],['trader','التاجر'],['camp','سهرات النار'],['camera','الكاميرا']];
+    const FEATS=[['surv','الناجون'],['switch','مفترقات السكة'],['wolves','ذئاب الليل'],['tapes','أشرطة سلمى'],['towers','أبراج المياه'],['marks','المعالم'],['tod','ليل ونهار'],['bio','تغيّر المناظر'],['amb','شفق متغيّر'],['events','أحداث عشوائية'],['hur','الأعاصير'],['zones','المناطق الخطرة'],['depth','عمق وأشجار قريبة'],['bloom','توهج'],['grain','حبيبات'],['gov','ضبط الجودة تلقائي'],['lamp','ضوء الغرف'],['d3','عمق 3D'],['hills','المنحدرات'],['bridges','الجسور الهشّة'],['av','الانهيار الثلجي'],['roof','شغلات السقف'],['trader','التاجر'],['camp','سهرات النار'],['camera','الكاميرا'],['outjob','شغل خارج القطار'],['timectl','التحكم بالزمن']];
     FEATS.forEach(([k,n])=>{const b=B(n,()=>{window.__F=window.__F||{};window.__F[k]=!FL(k);try{localStorage.setItem('lt_flags',JSON.stringify(window.__F));}catch(e){}paint();});b.dataset.k=k;p.appendChild(b);});
     const paint=()=>p.querySelectorAll('button[data-k]').forEach(b=>b.classList.toggle('on',FL(b.dataset.k)));paint();
     A('الكل شغّال',()=>{window.__F={lamp:false};try{localStorage.setItem('lt_flags',JSON.stringify(window.__F));}catch(e){}paint();});
@@ -5493,7 +5574,7 @@ function drawPlayer(){
     if(p>.15&&p<.9){ctx.fillStyle='#05090e';ctx.beginPath();ctx.moveTo(0,-5);ctx.lineTo(3,-10);ctx.lineTo(7,-8);ctx.lineTo(10,-10);ctx.lineTo(10.5,-5);ctx.fill();}
     ctx.restore();
   }
-  else if(S.work==='search'||S.work==='gsearch'||S.work==='water'||S.work==='leakfix'||S.work==='roof'){
+  else if(S.work==='search'||S.work==='gsearch'||S.work==='gwheel'||S.work==='water'||S.work==='leakfix'||S.work==='roof'){
     const sg=Math.sin(S.t*8),hx=13+sg*3,hy=-24+Math.abs(sg)*4;
     noodleArm(sx1,sy1,hx,hy,col,2);noodleArm(sx2,sy2,hx-3,hy+3,col,3);
     ctx.strokeStyle='#a8845a';ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(hx,hy);ctx.lineTo(hx+14,hy+9+sg*3);ctx.stroke();
@@ -5732,8 +5813,8 @@ function frame(ts){
   requestAnimationFrame(frame);
   const dt=Math.min(.05,(ts-last)/1000||0);last=ts;_frameDt=dt;
   try{
-    const _a=performance.now();if(mode==='play')update(dt);else idle(dt);
-    fx(dt);camera(dt,false);window.__tu=performance.now()-_a;
+    const _a=performance.now();const _n=(mode==='play'&&window.__tsN>1)?window.__tsN:1;if(mode==='play'){for(let _k=0;_k<_n;_k++)update(dt*(window.__tsS||1));}else idle(dt);
+    fx(dt*_n*(window.__tsS||1));camera(dt,false);window.__tu=performance.now()-_a;
   }catch(e){window.__err=e;console.error(e);}
   try{const _b=performance.now();render();window.__tr=performance.now()-_b;}catch(e){window.__err=e;console.error(e);try{for(let i=0;i<40;i++)ctx.restore();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';}catch(_){}}
   try{domUpdate();audioTick();}catch(e){window.__err=e;}
