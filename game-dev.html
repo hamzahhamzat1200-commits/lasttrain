@@ -5369,12 +5369,7 @@ function hudTick(dt){
   const x=X6();x.hint=x.hint||{};const p=S.d/GOAL;
   if(!S.modal&&!S.ground){for(let k=0;k<ENDH.length;k++){if(p>=ENDH[k][0]&&!x.hint[k]){x.hint[k]=1;say('📻 '+ENDH[k][1],7500);break;}}}
 }
-function drawOverShell(){
-  const k=clamp((.6-ZOOM)/.18,0,1);if(k<.02||S.ground)return;
-  ctx.save();beginPose(playerPoseP());
-  ctx.translate(TL+S.px,FLOOR);const s=1+.15*k;ctx.scale(s,s);ctx.translate(-(TL+S.px),-FLOOR);
-  drawPlayer();ctx.restore();
-}
+function drawOverShell(){}
 
 /* ===== DEVELOPER BUILD ONLY: test panel ===== */
 (function(){
@@ -5645,6 +5640,7 @@ function drawScarfTail(){
   for(let k=-1;k<=1;k++){ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(e.x+Math.cos(ang+k*.4)*3.4,e.y+Math.sin(ang+k*.4)*3.4+1);ctx.stroke();}
 }
 function drawPlayer(){
+  if(!S.ground&&clamp((.6-ZOOM)/.18,0,1)>=.5)return; // zoomed far out the closed train hides everyone inside
   const c=S.chr;
   const moving=Math.abs(S.pv)>14&&!S.work,ph=S.walk;
   const sw=moving?Math.sin(ph)*5.5:0,bob=moving?Math.abs(Math.sin(ph))*2:0;
@@ -5786,7 +5782,7 @@ function tag(x,y,label,hold,dead){
   if(hold){ctx.strokeStyle='#ff8a3d';ctx.lineWidth=1.4;circ(bx+8,by+h/2,3.5);ctx.stroke();ctx.fillStyle='#ff8a3d';circ(bx+8,by+h/2,1.2);ctx.fill();}
   ctx.restore();
 }
-function drawPromptTag(){
+function drawPromptTag(){if(!S.ground&&ZOOM<.5)return;
   if(mode!=='play'||!S.near)return;
   const p=promptFor(S.near);if(!p)return;
   tag(TL+S.px,GY+22,p.l,p.hold,p.dead);
@@ -5800,7 +5796,7 @@ function drawPromptTag(){
     ctx.fillStyle='#ff8a3d';rr(x,y,bw*clamp(pr,0,1),6,3);ctx.fill();
   }
 }
-function drawTargetMarker(){
+function drawTargetMarker(){if(!S.ground&&ZOOM<.5)return;
   let id=tutTarget();
   if(!id&&S.carry)id=S.ck==='crate'?(S.fuel<2.5?'furnace':'coal'):'furnace';
   if(!id&&!S.ground&&S.hull<50&&!S.carry)id='bench';
