@@ -1097,7 +1097,7 @@ function renderOutro(){
   try{$('oNext').focus();}catch(e){}
 }
 function end(r){
-  S.over=r;mode='over';inp.left=inp.right=inp.act=inp.pressed=false;
+  S.over=r;mode='over';if(r==='freeze')S.deadAt=performance.now();inp.left=inp.right=inp.act=inp.pressed=false;
   S.tut=null;hideSub();
   if(r==='win'){clearSave();setTimeout(()=>{if(mode==='over')startOutro();},1400);return;}
   const T={
@@ -1105,7 +1105,7 @@ function end(r){
     fuel:['خمدت النار','نفد الفحم وتوقف القطار، وصار جزءاً من الصمت الأبيض.'],
     hull:['خرج القطار عن السكة','الحديد لا يحتمل صدمة أخرى. افرمل قبل السكك المقطوعة.']
   }[r];
-  setTimeout(()=>{if(mode==='over'){const b=[];if(loadSave())b.push({t:'ارجع إلى آخر حفظ',fn:continueGame});b.push({t:'رحلة جديدة',fn:()=>newJourney(false)});showScreen(T[0],T[1],false,b);}},1100);
+  setTimeout(()=>{if(mode==='over'){const b=[];if(loadSave())b.push({t:'ارجع إلى آخر حفظ',fn:continueGame});b.push({t:'رحلة جديدة',fn:()=>newJourney(false)});showScreen(T[0],T[1],false,b);}},r==='freeze'?2600:(r==='fuel'?2000:1100));
 }
 
 /* ---------- fit & camera ---------- */
@@ -5723,13 +5723,19 @@ function drawTrain(){
 function toLocal(wx,wy){return [(wx-(TL+S.px))*S.face/CHS,(wy-FLOOR)/CHS];}
 function newChar(){
   const sc=[];for(let i=0;i<9;i++)sc.push({x:430,y:300,px:430,py:300});
-  return {lean:0,lv:0,hd:0,hv:0,ear:0,ev:0,sq:0,sv:0,blink:0,blinkT:2,sc:sc,init:0,ph:0,bumped:0,hat:0,hatv:0,look:0};
+  return {lean:0,lv:0,hd:0,hv:0,ear:0,ev:0,sq:0,sv:0,blink:0,blinkT:2,sc:sc,init:0,ph:0,bumped:0,hat:0,hatv:0,look:0,rest:0,idleT:0};
 }
 function charStep(dt,dirIn){
   const c=S.chr;if(!c)return;
   const moving=Math.abs(S.pv)>14&&!S.work;
   const tl=clamp(-S.aS*.05*S.face,-.2,.2)+(moving?S.face*.08:0)+(S.carry?S.face*.04:0);
-  c.lv+=((tl-c.lean)*90-c.lv*9)*dt;c.lean+=c.lv*dt;
+  const sh0=shelterAt(S.px),wl=(S.storm*.30+S.v*.0011)*(1-sh0)*(S.roofUp?1.4:1),cd0=1-clamp(S.warm/55,0,1);
+  const tl2=tl+S.face*(wl>.02?Math.min(wl,.32):0)+S.face*cd0*.1;
+  const still=!moving&&!S.work&&!S.clim&&!S.ground&&!S.roofUp&&!S.carry&&Math.abs(S.pv)<5&&!dirIn&&!S.furnaceT&&!(S.brkAnim>0);
+  c.idleT=still?c.idleT+dt:0;
+  const wantRest=(S.over==='fuel')||(c.idleT>6&&cd0<.55&&!S.over);
+  c.rest+=((wantRest?1:0)-c.rest)*(1-Math.exp(-(wantRest?2.2:7)*dt));
+  c.lv+=((tl2-c.lean)*90-c.lv*9)*dt;c.lean+=c.lv*dt;
   c.hv+=((-c.lean*1.3-c.hd)*140-c.hv*9)*dt;c.hd+=c.hv*dt;
   const wnd=-(S.v*.02)-S.storm*.6;
   const te=(moving?Math.sin(S.walk*2)*.5:0)+wnd*S.face-S.aS*.12*S.face+Math.sin(S.t*5)*.05;
@@ -5782,10 +5788,13 @@ function drawPlayer(){if(window.__noPlayer)return;
   const moving=Math.abs(S.pv)>14&&!S.work,ph=S.walk;
   const sw=moving?Math.sin(ph)*5.5:0,bob=moving?Math.abs(Math.sin(ph))*2:0;
   const cold=1-clamp(S.warm/55,0,1);
-  const shiv=cold>0?Math.sin(S.t*55)*cold*1.2:0;
+  const shiv=cold>0?Math.sin(S.t*55)*cold*(cold>.7?2.2:1.2)*(1-fallK()):0;
   const breathe=Math.sin(S.t*2.3)*.025;
   drawScarfTail();
   ctx.save();ctx.translate(TL+S.px+shiv,FLOOR-bob+(S.clim?S.clim.dy:(S.roofUp?-ROOF_H:0)));ctx.scale(S.face*CHS,CHS);
+  const RS=c.rest||0,FK=fallK();
+  if(FK>0){ctx.rotate(FK*1.5);ctx.translate(0,FK*2);}
+  if(RS>.01){ctx.translate(0,0);ctx.scale(1,1-RS*.34);}
   // legs and felt boots
   const cl=S.clim?S.clim.legs:0;
   const l1=sw*.7+cl,l2=-sw*.7-cl;
@@ -5863,6 +5872,8 @@ function drawPlayer(){if(window.__noPlayer)return;
     if(S.carry){ctx.fillStyle='#05090e';ctx.beginPath();ctx.moveTo(0,-5);ctx.lineTo(3,-10);ctx.lineTo(7,-8);ctx.lineTo(10,-10);ctx.lineTo(10.5,-5);ctx.fill();}
     ctx.restore();
   }
+  else if(FK>0){noodleArm(sx1,sy1,10+FK*8,-14,col,4);noodleArm(sx2,sy2,-4-FK*6,-12,col,4);}
+  else if(cold>.35||RS>.1){const hg=Math.max(cold,RS*.6);noodleArm(sx1,sy1,4,-27+Math.sin(S.t*55)*cold*.8,col,2+hg*2);noodleArm(sx2,sy2,-2,-28,col,3);}
   else{
     const sa=Math.sin(ph+Math.PI)*6;
     noodleArm(sx1,sy1,5+sa,-21,col,6);noodleArm(sx2,sy2,-8-sa,-21,col,6);
@@ -5886,7 +5897,7 @@ function drawPlayer(){if(window.__noPlayer)return;
   ctx.strokeStyle='#7d8990';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(3,-49,8.7,10.2,0,0,7);ctx.stroke();
   ctx.fillStyle='#7d8990';for(let k=0;k<12;k++){const aa=k/12*Math.PI*2;circ(3+Math.cos(aa)*9.1,-49+Math.sin(aa)*10.7,1.6);ctx.fill();}
   // tired, sunken eyes
-  const blink=c.blink>0,sq=cold>.5;
+  const blink=c.blink>0,sq=cold>.5||c.rest>.5||fallK()>.3;
   for(const ex of [1.2,7]){
     ctx.fillStyle='rgba(0,0,0,.5)';ctx.beginPath();ctx.ellipse(ex,-49.2,2.9,2.2,0,0,7);ctx.fill();
     if(blink||sq){ctx.strokeStyle='#cfe0ea';ctx.lineWidth=1.1;ctx.beginPath();ctx.moveTo(ex-1.8,-49.4);ctx.lineTo(ex+1.8,-49);ctx.stroke();}
@@ -5906,6 +5917,12 @@ function drawPlayer(){if(window.__noPlayer)return;
   ctx.restore();
   ctx.restore();
   if((S.work==='repair'||S.work==='grepair')&&Math.sin(S.repair*14)>.97){const nbk=S.work==='grepair'&&S.near?S.near.b:nextBreak();const bx=nbk!==null?FS+(sxw(nbk)-FS)/TS:TL+745;for(let i=0;i<4;i++)S.sparks.push({x:bx,y:GY-4,vx:rnd(-60,60),vy:rnd(-110,-30),a:1});}
+}
+
+function fallK(){
+  if(!S.deadAt||S.over!=='freeze')return 0;
+  const u=Math.min(1,(performance.now()-S.deadAt)/1300);
+  const e=u*u*(3-2*u);return e+(u>.85?Math.sin((u-.85)*40)*.02:0);
 }
 
 function tag(x,y,label,hold,dead){
