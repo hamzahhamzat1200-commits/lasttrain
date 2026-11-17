@@ -5732,6 +5732,71 @@ function mountains(par,base,amp,f,seed,col,cap,rim){
   ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.strokeStyle=rim;ctx.lineWidth=1.2;ctx.stroke();
 }
 
+/* ===== v35: atmosphere — wind-driven foreground trees, ambient fog bands, film grade ===== */
+function windNow(){
+  // ground wind (blows toward the left of the screen) + apparent wind from the train's own speed
+  const gust=.72+.28*Math.sin(S.t*.55+Math.sin(S.t*.21)*2.2)+.12*Math.sin(S.t*1.7);
+  const ground=(.16+S.storm*1.05)*gust;
+  const app=clamp(Math.abs(S.v)/40,0,1)*.35;
+  return -(ground+app);              // negative = leans/streams to the left
+}
+const TREE_SPR=[];
+function mkTrees(){
+  if(TREE_SPR.length)return;
+  for(let k=0;k<4;k++){
+    const c=document.createElement('canvas');c.width=260;c.height=460;const g=c.getContext('2d');
+    let s=11+k*37;const r=()=>{s=(s*16807)%2147483647;return s/2147483647;};
+    g.strokeStyle='#04080e';g.lineCap='round';
+    const br=(x,y,a,L,w,d)=>{
+      if(d>6||L<7)return;
+      const x1=x+Math.cos(a)*L,y1=y-Math.sin(a)*L;g.lineWidth=Math.max(1,w);g.beginPath();g.moveTo(x,y);g.lineTo(x1,y1);g.stroke();
+      const n=d<2?2:(r()<.55?2:1);
+      for(let i=0;i<n;i++){const side=(i%2?1:-1);br(x1,y1,a+side*(.28+r()*.5)+(r()-.5)*.1,L*(.62+r()*.16),w*.66,d+1);}
+      if(r()<.8)br(x1,y1,a+(r()-.5)*.25,L*.74,w*.7,d+1);
+    };
+    br(130,458,Math.PI/2+(r()-.5)*.1,110+r()*40,9+k,0);
+    TREE_SPR.push(c);
+  }
+}
+function drawTreeBent(spr,x,base,h,lean,ph,alpha){
+  const sc=h/spr.height,N=7,sw=spr.width*sc,sh=spr.height/N;
+  let dx=0;
+  ctx.save();ctx.globalAlpha=alpha;
+  for(let i=0;i<N;i++){                 // from the ground up
+    const f=(i+.5)/N,sy=spr.height-(i+1)*sh;
+    const bend=lean*h*.06*(f*f+.25*f);  // stronger bend towards the top
+    const flut=Math.sin(S.t*(2.2+f)+ph+f*3)*(.5+Math.abs(lean)*3)*f*f*h*.012;
+    dx=bend+flut;
+    ctx.drawImage(spr,0,sy,spr.width,sh+1.2,x-sw/2+dx*1.0*(i+1)/ (i+1),base-(i+1)*sh*sc,sw,sh*sc+1.2);
+  }
+  ctx.restore();
+}
+const TREEQ={on:true,acc:0,n:0};
+function drawFgTrees(){
+  if(!FL('atmo')||!TREEQ.on||mode!=='play'&&mode!=='intro')return;
+  if(typeof _frameDt==='number'&&!window.__keepFx){TREEQ.acc+=_frameDt;TREEQ.n++;if(TREEQ.n>=120){if(TREEQ.acc/TREEQ.n>.036)TREEQ.on=false;TREEQ.acc=0;TREEQ.n=0;}}
+  mkTrees();const w=windNow(),Pn=3000,n=5;
+  for(let i=0;i<n;i++){
+    const hx=hash(i*7.3)*260,h=190+hash(i*3.1+2)*130;
+    const x=mod(i*(Pn/n)+hx-S.d*PX*1.7,Pn)+CAMX-380;
+    if(x<CAMX-120||x>CAMX+VWIN+120)continue;
+    const mid=(x-CAMX)/VWIN,c=Math.abs(mid-.5);
+    const alpha=.28+.72*clamp((c-.16)/.26,0,1);
+    drawTreeBent(TREE_SPR[i%4],x,GY+150,h,w,i*1.7,alpha);
+  }
+}
+// existing mid-distance dead trees now bend with the wind too (later definition wins)
+function deadTree(x,y,h,col,a){
+  const w=FL('atmo')?windNow():0,ph=x*.013;
+  const off=f=>w*h*.20*(f*f+.2*f)+Math.sin(S.t*(1.9+f*1.2)+ph+f*2.6)*(.4+Math.abs(w)*2.4)*f*f*h*.02;
+  ctx.strokeStyle=col;ctx.globalAlpha=a;ctx.lineWidth=Math.max(1.2,h*.05);
+  ctx.beginPath();ctx.moveTo(x,y);
+  for(let k=1;k<=5;k++){const f=k/5;ctx.lineTo(x+h*.03*f+off(f),y-h*f);}
+  for(let k=0;k<4;k++){const f=.35+k*.17,yy=y-h*f,s=k%2?1:-1,l=h*(.34-k*.05),bx=x+h*.02+off(f),fl=off(f+.12)-off(f);
+    ctx.moveTo(bx,yy);ctx.lineTo(bx+s*l+fl*1.6,yy-l*.55);ctx.moveTo(bx+s*l*.6+fl,yy-l*.33);ctx.lineTo(bx+s*l*.9+fl*2.2,yy-l*.9);}
+  ctx.stroke();ctx.globalAlpha=1;
+}
+
 /* ===== DEVELOPER BUILD ONLY: test panel ===== */
 (function(){
   const st=document.createElement('style');
@@ -6256,7 +6321,7 @@ function render(){
   ctx.restore();
   drawTargetMarker();drawPromptTag();
   ctx.restore();
-  ctx.save();trainScale();drawFx();ctx.restore();drawNearDepth();drawRoadside();d3Front();drawFg();drawSnow();fogLayer(S.fog,true);
+  ctx.save();trainScale();drawFx();ctx.restore();drawNearDepth();drawFgTrees();drawRoadside();d3Front();drawFg();drawSnow();fogLayer(S.fog,true);
   todOverlay();gradePass();bloomPass(_frameDt);overlays();
 }
 
