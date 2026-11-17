@@ -4954,8 +4954,9 @@ function d3Bevel(){
   g.addColorStop(0,'rgba(255,240,220,.30)');g.addColorStop(.22,'rgba(255,240,220,.06)');g.addColorStop(.7,'rgba(0,0,20,.10)');g.addColorStop(1,'rgba(0,0,20,.38)');
   ctx.fillStyle=g;ctx.fillRect(x0,top,w,h);
   ctx.restore();
-  // vertical shading at each car edge so cars read as separate solid boxes
+  // vertical shading at each car edge so cars read as separate solid boxes (clipped to the real silhouette)
   ctx.save();
+  ctx.beginPath();ctx.rect(TL,FLOOR-108,190,108+10);ctx.rect(TL+190,FLOOR-60,200,60+10);ctx.rect(TL+390,FLOOR-125,350,125+10);ctx.clip();
   for(const e of [0,196,392,588,780]){
     const x=TL+e;
     let g2=ctx.createLinearGradient(x-9,0,x+9,0);
@@ -4965,6 +4966,8 @@ function d3Bevel(){
   // roof top-face: thin lit parallelogram, as if seen slightly from above
   ctx.fillStyle='rgba(215,235,250,.10)';
   for(const e of [0,196,392]){const x=TL+e+4;ctx.beginPath();ctx.moveTo(x,GY-142);ctx.lineTo(x+180,GY-142);ctx.lineTo(x+170,GY-150);ctx.lineTo(x+12,GY-150);ctx.closePath();ctx.fill();}
+  ctx.restore();
+  ctx.save();
   // contact shadow under the chassis
   ctx.save();ctx.translate(x0+w/2,GY-4);ctx.scale(1,.06);let g3=ctx.createRadialGradient(0,0,0,0,0,w/2);g3.addColorStop(0,'rgba(0,0,8,.4)');g3.addColorStop(.75,'rgba(0,0,8,.25)');g3.addColorStop(1,'rgba(0,0,8,0)');
   ctx.fillStyle=g3;ctx.fillRect(-w/2,-w/2,w,w);ctx.restore();
